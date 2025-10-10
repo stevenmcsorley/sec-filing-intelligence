@@ -13,13 +13,20 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def token_to_user_context(token: TokenContext) -> dict[str, Any]:
-    """Convert TokenContext to OPA user context format."""
+    """Convert TokenContext to OPA user context format.
+
+    TODO [TRELLO-004]: Replace hardcoded values with real data:
+    - subscription.tier: Query user's subscription from DB (users/subscriptions table)
+    - org_id: Extract from Keycloak token custom claims (groups/org membership)
+
+    These hardcoded stubs prevent OPA from making real tenant/tier decisions.
+    """
     return {
         "id": token.subject,
         "email": token.email,
         "roles": token.roles,
-        "subscription": {"tier": "free"},  # TODO: fetch from DB
-        "org_id": "default",  # TODO: fetch from token claims or DB
+        "subscription": {"tier": "free"},  # STUB: hardcoded for MVP bootstrap
+        "org_id": "default",  # STUB: hardcoded for MVP bootstrap
     }
 
 
