@@ -1,0 +1,12 @@
+{
+  "feature_flags": {
+    "diff_engine_enabled": true,
+    "ml_scoring_enabled": false,
+    "export_enabled": true,
+    "historical_analytics_enabled": true
+  },
+  "policy_config": {
+    "free_delay_ns": 1200000000000,
+    "default_cache_ttl_seconds": 60
+  }
+}

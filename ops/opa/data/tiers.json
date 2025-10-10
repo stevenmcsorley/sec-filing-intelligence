@@ -1,0 +1,26 @@
+{
+  "tiers": {
+    "free": {
+      "max_tickers": 5,
+      "max_watchlists": 1,
+      "alert_delay_seconds": 1200,
+      "features": {
+        "real_time_alerts": false,
+        "diff_view": false,
+        "export": false,
+        "history_access": false
+      }
+    },
+    "pro": {
+      "max_tickers": 200,
+      "max_watchlists": 10,
+      "alert_delay_seconds": 0,
+      "features": {
+        "real_time_alerts": true,
+        "diff_view": true,
+        "export": true,
+        "history_access": true
+      }
+    }
+  }
+}
