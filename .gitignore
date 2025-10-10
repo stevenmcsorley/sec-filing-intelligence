@@ -27,3 +27,6 @@ coverage/
 .pytest_cache/
 frontend/coverage/
 backend/.mypy_cache/
+
+# Local environment overrides
+config/*.env

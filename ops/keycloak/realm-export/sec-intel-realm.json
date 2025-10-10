@@ -1,0 +1,144 @@
+{
+  "realm": "sec-intel",
+  "enabled": true,
+  "displayName": "SEC Filing Intelligence",
+  "loginWithEmailAllowed": true,
+  "registrationAllowed": false,
+  "rememberMe": true,
+  "resetPasswordAllowed": true,
+  "verifyEmail": true,
+  "clients": [
+    {
+      "clientId": "frontend",
+      "name": "Frontend SPA",
+      "rootUrl": "http://localhost:3000",
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "clientAuthenticatorType": "client-secret",
+      "secret": "",
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [
+        "profile",
+        "email",
+        "roles"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "backend",
+      "name": "Backend API",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "consentRequired": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "",
+      "attributes": {
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "true"
+      },
+      "defaultClientScopes": [
+        "roles",
+        "profile"
+      ]
+    },
+    {
+      "clientId": "worker",
+      "name": "Background Workers",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "",
+      "defaultClientScopes": [
+        "roles",
+        "profile"
+      ]
+    },
+    {
+      "clientId": "grafana",
+      "name": "Grafana",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "",
+      "redirectUris": [
+        "http://localhost:3001/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3001"
+      ],
+      "defaultClientScopes": [
+        "roles",
+        "profile"
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "super_admin",
+        "description": "Full platform administration rights"
+      },
+      {
+        "name": "org_admin",
+        "description": "Manage organisation settings and watchlists"
+      },
+      {
+        "name": "analyst_pro",
+        "description": "Pro subscription analyst"
+      },
+      {
+        "name": "basic_free",
+        "description": "Free tier analyst"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "default-org",
+      "path": "/default-org",
+      "realmRoles": [
+        "basic_free"
+      ]
+    }
+  ],
+  "defaultRole": {
+    "name": "default-roles-sec-intel",
+    "realm": "sec-intel",
+    "composite": true,
+    "clientRole": false,
+    "containerId": "sec-intel",
+    "composites": {
+      "realm": [
+        "basic_free"
+      ]
+    }
+  }
+}

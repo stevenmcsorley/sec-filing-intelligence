@@ -28,6 +28,15 @@ make test      # frontend and backend unit tests
 
 These commands invoke scripts under `scripts/ci/` and must pass before requesting review.
 
+## Environment & Auth Bootstrap
+
+- Copy `config/backend.env.example` and `config/keycloak.env.example` to `.env` counterparts before running Docker Compose.
+- After the stack is up (`docker compose -f ops/compose/docker-compose.yml up -d`), import the Keycloak realm:
+  ```bash
+  ./ops/keycloak/seed-realm.sh
+  ```
+- The FastAPI app provides `/auth/health` and `/auth/me` for quick smoke tests against the Keycloak discovery endpoint and JWT verification pipeline.
+
 ## Commit Hooks & Conventional Commit Enforcement
 
 Install repo-level dev dependencies:

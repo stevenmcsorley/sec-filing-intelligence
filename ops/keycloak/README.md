@@ -1,18 +1,30 @@
 # Keycloak Realm Bootstrap
 
-This directory stores exported realm configuration for the `sec-intel` realm.
+This directory provides the declarative assets and tooling required to seed the `sec-intel` realm locally.
 
-## Target State
+## Artifacts
+
+- `realm-export/sec-intel-realm.json` — sanitized realm export including required clients and realm roles.
+- `seed-realm.sh` — helper script that uses `kcadm.sh` (Keycloak admin CLI) to import/update the realm.
+
+## Usage
+
+1. Copy `config/keycloak.env.example` to `config/keycloak.env` and adjust the admin credentials before starting the stack.
+2. Start the compose stack:  
+   ```bash
+   cd ops/compose
+   docker compose up -d keycloak postgres
+   ```
+3. Once Keycloak is listening on port 8080, seed (or update) the realm:
+   ```bash
+   ./ops/keycloak/seed-realm.sh
+   ```
+   The script is idempotent — if the realm already exists it skips recreation.
+
+## Realm Contents
 
 - Clients: `frontend`, `backend`, `worker`, `grafana`.
-- Roles: `super_admin`, `org_admin`, `analyst_pro`, `basic_free`.
-- Groups: organization membership scaffolding.
+- Realm roles: `super_admin`, `org_admin`, `analyst_pro`, `basic_free`.
+- Default group `default-org` with the `basic_free` role attached.
 
-## Local Workflow
-
-1. Launch Keycloak via `docker compose` (see `ops/compose`).
-2. Run `./scripts/keycloak/export.sh` (to be implemented) to export the realm to `realm-export/`.
-3. Commit sanitized exports (remove secrets, user PII).
-4. Document admin credentials and default accounts in `docs/` (never check secrets into git).
-
-Upcoming Trello cards will replace this README with concrete seeding scripts and automation.
+Never commit real credentials or user exports. Keep all secrets in `config/keycloak.env` (ignored by git).

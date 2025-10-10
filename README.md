@@ -20,16 +20,34 @@ This repository contains the monorepo for the SEC Filing Intelligence platform d
    - Node.js ≥ 20.10 (frontend) with Corepack enabled.
    - Python ≥ 3.11 (backend) with `uv` or `pip`.
    - Docker & Docker Compose (local orchestration).
-3. Bootstrap dependencies:
+3. Copy environment templates and adjust secrets:
+   ```bash
+   cp config/backend.env.example config/backend.env
+   cp config/keycloak.env.example config/keycloak.env
+   ```
+4. Bootstrap dependencies:
    ```bash
    npm install     # installs root dev tooling (husky, commitlint)
    npm install --prefix frontend
    python -m pip install -r backend/requirements-dev.txt
    ```
-4. Run local quality gates:
+5. Run local quality gates:
    ```bash
    make lint typecheck test
    ```
+
+## Keycloak Bootstrap
+
+The stack expects a Keycloak realm named `sec-intel` with clients (`frontend`, `backend`, `worker`, `grafana`) and tier roles. After starting the compose stack run:
+
+```bash
+docker compose -f ops/compose/docker-compose.yml up -d keycloak postgres
+./ops/keycloak/seed-realm.sh
+```
+
+The helper script imports `ops/keycloak/realm-export/sec-intel-realm.json` using the admin credentials from `config/keycloak.env`.
+
+FastAPI exposes `/auth/health` for checking the discovery endpoint and `/auth/me` for basic token introspection once Keycloak is running.
 
 ## Continuous Integration
 

@@ -16,10 +16,17 @@ This stack wires together the core services required for local development:
 # Ensure env files exist
 cp config/backend.env.example config/backend.env
 cp config/frontend.env.example config/frontend.env
+cp config/keycloak.env.example config/keycloak.env
 
 # Build & launch
 cd ops/compose
 docker compose up --build
+```
+
+After Keycloak is healthy, import the realm definition once:
+
+```bash
+./ops/keycloak/seed-realm.sh
 ```
 
 OPA policies and Keycloak realm exports are mounted from sibling directories (`../opa` and `../keycloak`). Populate them before running full auth flows.
