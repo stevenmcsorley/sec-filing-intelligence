@@ -1,0 +1,101 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    env_file:
+      - ../../config/backend.env.example
+    depends_on:
+      - postgres
+      - redis
+      - opa
+    networks:
+      - secnet
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: frontend/Dockerfile
+    env_file:
+      - ../../config/frontend.env.example
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+    networks:
+      - secnet
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: filings
+      POSTGRES_USER: filings
+      POSTGRES_PASSWORD: filings
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - secnet
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks:
+      - secnet
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2024-09-27T15-23-35Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: filings
+      MINIO_ROOT_PASSWORD: filingsfilings
+    volumes:
+      - minio:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - secnet
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0.2
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_URL_DATABASE: filings
+      KC_DB_USERNAME: filings
+      KC_DB_PASSWORD: filings
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ../keycloak/realm-export:/opt/keycloak/data/import
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    networks:
+      - secnet
+
+  opa:
+    image: openpolicyagent/opa:0.67.0
+    command: run --server --set=decision_logs.console=true /policies
+    volumes:
+      - ../opa:/policies
+    ports:
+      - "8181:8181"
+    networks:
+      - secnet
+
+networks:
+  secnet:
+    driver: bridge
+
+volumes:
+  pgdata:
+  minio:

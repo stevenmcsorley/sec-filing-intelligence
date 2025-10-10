@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+description: "SEC Filing Intelligence issue templates"
+contact_links:
+  - name: Product Requirements
+    url: https://github.com/stevenmcsorley/sec-filing-intelligence/blob/main/PRD.md
+    about: Review the PRD before opening feature requests.

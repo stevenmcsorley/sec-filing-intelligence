@@ -1,0 +1,28 @@
+{
+  "name": "sec-filing-intelligence",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "prepare": "husky install",
+    "lint": "make lint",
+    "typecheck": "make typecheck",
+    "test": "make test",
+    "commitlint": "commitlint --from=HEAD~1"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.3.0",
+    "@commitlint/config-conventional": "^19.2.2",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.9"
+  },
+  "lint-staged": {
+    "*": [
+      "make lint"
+    ]
+  },
+  "engines": {
+    "node": ">=20.10"
+  }
+}

@@ -1,0 +1,29 @@
+# Node artifacts
+node_modules/
+pnpm-lock.yaml
+yarn.lock
+*.log
+.next/
+out/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage and test results
+coverage/
+.pytest_cache/
+frontend/coverage/
+backend/.mypy_cache/
