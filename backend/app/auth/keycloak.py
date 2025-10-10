@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
-from typing import Protocol
+from typing import Any, Protocol
 
 import jwt
 from fastapi import HTTPException, status
@@ -13,7 +13,7 @@ from .models import TokenContext
 
 
 class JWKClientProtocol(Protocol):
-    def get_signing_key_from_jwt(self, token: str):  # pragma: no cover - protocol definition
+    def get_signing_key_from_jwt(self, token: str) -> Any:  # pragma: no cover - protocol definition
         ...
 
 
@@ -71,10 +71,10 @@ class KeycloakTokenVerifier:
 class StaticJWKClient:
     """Utility JWK client used in tests to avoid network calls."""
 
-    def __init__(self, jwks: dict) -> None:
+    def __init__(self, jwks: dict[str, list[dict[str, object]]]) -> None:
         self._jwks = jwks
 
-    def get_signing_key_from_jwt(self, token: str):
+    def get_signing_key_from_jwt(self, token: str) -> SimpleNamespace:
         header = jwt.get_unverified_header(token)
         kid = header.get("kid")
         for jwk_entry in self._jwks.get("keys", []):

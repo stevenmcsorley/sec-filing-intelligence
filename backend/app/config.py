@@ -2,8 +2,16 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from typing import TypedDict
 
 from pydantic import AnyHttpUrl, BaseModel, Field, HttpUrl, ValidationError
+
+
+class _KeycloakEnv(TypedDict):
+    keycloak_server_url: str
+    keycloak_realm: str
+    keycloak_client_id: str
+    keycloak_audience: str
 
 
 def _parse_algorithms() -> list[str]:
@@ -50,8 +58,20 @@ def _load_settings() -> Settings:
             "Missing required Keycloak environment variables: " + ", ".join(missing)
         )
 
+    assert environment["keycloak_server_url"] is not None
+    assert environment["keycloak_realm"] is not None
+    assert environment["keycloak_client_id"] is not None
+    assert environment["keycloak_audience"] is not None
+
+    typed_environment: _KeycloakEnv = {
+        "keycloak_server_url": environment["keycloak_server_url"],
+        "keycloak_realm": environment["keycloak_realm"],
+        "keycloak_client_id": environment["keycloak_client_id"],
+        "keycloak_audience": environment["keycloak_audience"],
+    }
+
     try:
-        return Settings(**environment)
+        return Settings.model_validate(typed_environment)
     except ValidationError as exc:  # pragma: no cover - pydantic already exercised in tests
         raise RuntimeError(f"Invalid settings detected: {exc}") from exc
 

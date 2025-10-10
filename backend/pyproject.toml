@@ -26,4 +26,4 @@ warn_unused_ignores = true
 strict_optional = true
 check_untyped_defs = true
 disallow_untyped_defs = true
-include = ["app"]
+files = ["app"]
