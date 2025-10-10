@@ -9,6 +9,8 @@ dependencies = []
 line-length = 100
 target-version = "py311"
 src = ["app"]
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.format]
