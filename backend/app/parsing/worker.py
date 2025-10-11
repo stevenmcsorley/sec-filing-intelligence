@@ -39,6 +39,13 @@ class ArtifactFetcher(Protocol):
         ...
 
 
+@dataclass(slots=True)
+class ChunkQueueTarget:
+    queue: ChunkQueue
+    suffix: str = ""
+    backpressure: QueueBackpressure | None = None
+
+
 class ParserWorker:
     def __init__(
         self,
@@ -48,9 +55,8 @@ class ParserWorker:
         session_factory: async_sessionmaker[AsyncSession],
         fetcher: ArtifactFetcher,
         options: ParserOptions,
-        chunk_queue: ChunkQueue | None = None,
+        chunk_targets: Iterable[ChunkQueueTarget] | None = None,
         chunk_planner: ChunkPlanner | None = None,
-        chunk_backpressure: QueueBackpressure | None = None,
         chunk_options: ChunkPlannerOptions | None = None,
     ) -> None:
         self._name = name
@@ -58,11 +64,11 @@ class ParserWorker:
         self._session_factory = session_factory
         self._fetcher = fetcher
         self._options = options
-        self._chunk_queue = chunk_queue
-        self._chunk_planner = chunk_planner or (
-            ChunkPlanner(chunk_options) if chunk_queue else None
-        )
-        self._chunk_backpressure = chunk_backpressure
+        self._chunk_targets: list[ChunkQueueTarget] = list(chunk_targets or [])
+        if not self._chunk_targets and chunk_planner is None:
+            self._chunk_planner = None
+        else:
+            self._chunk_planner = chunk_planner or ChunkPlanner(chunk_options)
 
     async def run(self, stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
@@ -127,9 +133,7 @@ class ParserWorker:
                 filing.status = FilingStatus.PARSED.value
             PARSER_SECTIONS_TOTAL.inc(len(sections))
 
-        if self._chunk_queue and self._chunk_planner and planner_sections:
-            if self._chunk_backpressure is not None:
-                await self._chunk_backpressure.wait_if_needed()
+        if self._chunk_targets and self._chunk_planner and planner_sections:
             plan_start = datetime.now(UTC)
             jobs = self._chunk_planner.plan(task.accession_number, planner_sections)
             CHUNK_PLANNER_LATENCY_SECONDS.observe(
@@ -139,7 +143,14 @@ class ParserWorker:
                 form_type = "unknown"
             CHUNK_PLANNER_CHUNKS_TOTAL.labels(form_type).inc(len(jobs))
             for job in jobs:
-                await self._chunk_queue.push(job)
+                for target in self._chunk_targets:
+                    if target.backpressure is not None:
+                        await target.backpressure.wait_if_needed()
+                    if target.suffix:
+                        job_to_push = job.with_job_id(f"{job.job_id}{target.suffix}")
+                    else:
+                        job_to_push = job
+                    await target.queue.push(job_to_push)
         PARSER_LATENCY_SECONDS.observe((datetime.now(UTC) - start).total_seconds())
 
     async def _mark_failed(self, task: ParseTask) -> None:

@@ -11,6 +11,7 @@ from app.models import (  # noqa: F401
     Filing,
     FilingAnalysis,
     FilingBlob,
+    FilingEntity,
     FilingSection,
     Organization,
     Subscription,

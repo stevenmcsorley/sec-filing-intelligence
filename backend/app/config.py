@@ -165,6 +165,49 @@ class Settings(BaseModel):
         default=float(os.getenv("SUMMARIZER_BACKOFF_SECONDS", "2.0"))
     )
 
+    entity_extraction_enabled: bool = Field(
+        default=os.getenv("ENTITY_EXTRACTION_ENABLED", "true").lower() == "true"
+    )
+    entity_concurrency: int = Field(
+        default=int(os.getenv("ENTITY_CONCURRENCY", "2"))
+    )
+    entity_queue_name: str = Field(
+        default=os.getenv("ENTITY_QUEUE_NAME", "sec:groq:entity")
+    )
+    entity_queue_visibility_timeout_seconds: int = Field(
+        default=int(os.getenv("ENTITY_QUEUE_VISIBILITY_TIMEOUT_SECONDS", "600"))
+    )
+    entity_queue_requeue_batch_size: int = Field(
+        default=int(os.getenv("ENTITY_QUEUE_REQUEUE_BATCH_SIZE", "200"))
+    )
+    entity_queue_pause_threshold: int = Field(
+        default=int(os.getenv("ENTITY_QUEUE_PAUSE_THRESHOLD", "1000"))
+    )
+    entity_queue_resume_threshold: int = Field(
+        default=int(os.getenv("ENTITY_QUEUE_RESUME_THRESHOLD", "750"))
+    )
+    entity_backpressure_check_interval_seconds: float = Field(
+        default=float(os.getenv("ENTITY_BACKPRESSURE_CHECK_INTERVAL_SECONDS", "1.0"))
+    )
+    entity_model: str = Field(
+        default=os.getenv("ENTITY_MODEL", "llama-3.3-70b-versatile")
+    )
+    entity_temperature: float = Field(
+        default=float(os.getenv("ENTITY_TEMPERATURE", "0"))
+    )
+    entity_max_output_tokens: int = Field(
+        default=int(os.getenv("ENTITY_MAX_OUTPUT_TOKENS", "512"))
+    )
+    entity_request_timeout: float = Field(
+        default=float(os.getenv("ENTITY_REQUEST_TIMEOUT", "30"))
+    )
+    entity_max_retries: int = Field(
+        default=int(os.getenv("ENTITY_MAX_RETRIES", "3"))
+    )
+    entity_backoff_seconds: float = Field(
+        default=float(os.getenv("ENTITY_BACKOFF_SECONDS", "2.0"))
+    )
+
     minio_endpoint: str = Field(default=os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
     minio_access_key: str = Field(default=os.getenv("MINIO_ACCESS_KEY", "filings"))
     minio_secret_key: str = Field(default=os.getenv("MINIO_SECRET_KEY", "filingsfilings"))

@@ -17,7 +17,7 @@ from app.orchestration.planner import ChunkPlanner, ChunkPlannerOptions
 from app.orchestration.queue import ChunkQueue, RedisChunkQueue
 
 from .queue import ParseQueue, RedisParseQueue
-from .worker import ParserOptions, ParserWorker
+from .worker import ChunkQueueTarget, ParserOptions, ParserWorker
 
 LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +30,8 @@ class ParserService:
         self._session_factory: async_sessionmaker[AsyncSession] | None = None
         self._chunk_queue: ChunkQueue | None = None
         self._chunk_backpressure: QueueBackpressure | None = None
+        self._entity_queue: ChunkQueue | None = None
+        self._entity_backpressure: QueueBackpressure | None = None
         self._chunk_planner: ChunkPlanner | None = None
         self._tasks: list[asyncio.Task[None]] = []
         self._stop_event = asyncio.Event()
@@ -72,6 +74,32 @@ class ParserService:
                 resume_threshold=resume_threshold,
                 check_interval=self._settings.chunk_backpressure_check_interval_seconds,
             )
+
+        if self._settings.entity_extraction_enabled:
+            entity_redis = Redis.from_url(
+                self._settings.redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            self._entity_queue = RedisChunkQueue(
+                entity_redis,
+                self._settings.entity_queue_name,
+                visibility_timeout=self._settings.entity_queue_visibility_timeout_seconds,
+                requeue_batch_size=self._settings.entity_queue_requeue_batch_size,
+            )
+            if self._settings.entity_queue_pause_threshold > 0:
+                entity_resume = max(
+                    0,
+                    self._settings.entity_queue_resume_threshold
+                    or self._settings.entity_queue_pause_threshold // 2,
+                )
+                self._entity_backpressure = QueueBackpressure(
+                    entity_redis,
+                    self._settings.entity_queue_name,
+                    pause_threshold=self._settings.entity_queue_pause_threshold,
+                    resume_threshold=entity_resume,
+                    check_interval=self._settings.entity_backpressure_check_interval_seconds,
+                )
         self._chunk_planner = ChunkPlanner(
             ChunkPlannerOptions(
                 max_tokens_per_chunk=self._settings.chunker_max_tokens_per_chunk,
@@ -93,6 +121,24 @@ class ParserService:
             backoff_seconds=self._settings.parser_backoff_seconds,
         )
 
+        chunk_targets: list[ChunkQueueTarget] = []
+        if self._chunk_queue is not None:
+            chunk_targets.append(
+                ChunkQueueTarget(
+                    queue=self._chunk_queue,
+                    suffix="",
+                    backpressure=self._chunk_backpressure,
+                )
+            )
+        if self._entity_queue is not None:
+            chunk_targets.append(
+                ChunkQueueTarget(
+                    queue=self._entity_queue,
+                    suffix=":entity",
+                    backpressure=self._entity_backpressure,
+                )
+            )
+
         for index in range(self._settings.parser_concurrency):
             worker = ParserWorker(
                 name=f"parser-{index}",
@@ -100,9 +146,8 @@ class ParserService:
                 session_factory=self._session_factory,
                 fetcher=self._storage,
                 options=options,
-                chunk_queue=self._chunk_queue,
+                chunk_targets=chunk_targets,
                 chunk_planner=self._chunk_planner,
-                chunk_backpressure=self._chunk_backpressure,
             )
             task = asyncio.create_task(worker.run(self._stop_event))
             self._tasks.append(task)
@@ -125,6 +170,9 @@ class ParserService:
         if self._chunk_queue is not None:
             await self._chunk_queue.close()
             self._chunk_queue = None
+        if self._entity_queue is not None:
+            await self._entity_queue.close()
+            self._entity_queue = None
         self._tasks.clear()
         self._started = False
         LOGGER.info("Parser service stopped")

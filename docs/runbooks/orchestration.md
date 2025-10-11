@@ -26,6 +26,14 @@ Environment variables (see `config/backend.env.example`; overrides can be placed
 | `CHUNKER_MAX_TOKENS_PER_CHUNK` | Upper bound on estimated tokens per chunk. | `800` |
 | `CHUNKER_MIN_TOKENS_PER_CHUNK` | Minimum tokens before planner greedily adds more paragraphs. | `200` |
 | `CHUNKER_PARAGRAPH_OVERLAP` | Paragraph overlap between successive chunks. | `1` |
+| `ENTITY_QUEUE_NAME` | Redis list used for entity extraction jobs. | `sec:groq:entity` |
+| `ENTITY_QUEUE_VISIBILITY_TIMEOUT_SECONDS` | Seconds before an unacked entity job is requeued. | `600` |
+| `ENTITY_QUEUE_PAUSE_THRESHOLD` | Queue depth that pauses new entity jobs. | `1000` |
+| `ENTITY_QUEUE_RESUME_THRESHOLD` | Queue depth that resumes entity planning after pause. | `750` |
+| `ENTITY_MODEL` | Default Groq model for entity extraction. | `llama-3.3-70b-versatile` |
+| `ENTITY_MAX_OUTPUT_TOKENS` | Output token cap for entity responses. | `512` |
+| `SUMMARIZER_MODEL` | Groq model for section summaries. | `mixtral-8x7b-32768` |
+| `SUMMARIZER_MAX_OUTPUT_TOKENS` | Output token cap for summaries. | `256` |
 
 ## Metrics
 
@@ -33,6 +41,8 @@ Environment variables (see `config/backend.env.example`; overrides can be placed
 - `sec_chunk_planner_chunks_total{form_type}` — Counter of chunk jobs emitted per filing form type.
 - `sec_ingestion_queue_depth{queue_name="sec:groq:chunk"}` — Queue depth gauge (shared with backpressure helper).
 - `sec_ingestion_backpressure_events_total{queue_name="sec:groq:chunk",event}` — Pause/resume transitions triggered by backlog.
+- `sec_entity_extraction_latency_seconds{model}` — Latency histogram for entity jobs.
+- `sec_entity_extraction_entities_total{entity_type}` — Count of extracted entities per category.
 
 ## Operational Notes
 
@@ -54,3 +64,14 @@ Environment variables (see `config/backend.env.example`; overrides can be placed
   - `sec_section_summary_latency_seconds{model}`
   - `sec_section_summary_errors_total{stage}`
   - `sec_section_summary_completions_total{model}`
+
+## Entity Extraction Worker
+
+- `EntityExtractionService` consumes the dedicated entity queue (`ENTITY_QUEUE_NAME`) and produces structured entities (executive changes, guidance updates, litigation, covenants, related-party transactions, risk factor changes).
+- Results are persisted in `filing_analyses` with `analysis_type = entity_extraction` and normalized into `filing_entities` (type, label, confidence, supporting excerpt, metadata).
+- Parser workers fan out chunk jobs to both summary and entity queues; dedupe keys are unique per queue (`<job_id>:entity`).
+- Retry/backoff semantics mirror the summarizer: retry on 429/5xx, acknowledge fatal 4xx or malformed responses.
+- Metrics of interest:
+  - `sec_entity_extraction_latency_seconds{model}`
+  - `sec_entity_extraction_errors_total{stage}`
+  - `sec_entity_extraction_entities_total{entity_type}`
