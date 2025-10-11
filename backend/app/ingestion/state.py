@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 from typing import Protocol
 
 from redis.asyncio import Redis
@@ -23,7 +24,11 @@ class RedisAccessionStateStore:
         self._key = key
 
     async def mark_seen(self, accession_number: str) -> bool:
-        added = await self._redis.sadd(self._key, accession_number)
+        result = self._redis.sadd(self._key, accession_number)
+        if isinstance(result, Awaitable):
+            added = await result
+        else:
+            added = result
         return added == 1
 
 

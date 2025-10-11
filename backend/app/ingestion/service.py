@@ -33,7 +33,7 @@ class IngestionService:
         self._pollers: list[Poller] = []
         self._tasks: list[asyncio.Task[None]] = []
         self._client_lifespan_cm = self._feed_client.lifespan()
-        self._client_lifespan_token: object | None = None
+        self._client_lifespan_active = False
 
     async def start(self) -> None:
         """Start pollers if ingestion is enabled."""
@@ -45,27 +45,31 @@ class IngestionService:
             LOGGER.warning("Redis URL missing; disabling ingestion service")
             return
 
-        self._redis = Redis.from_url(
+        redis_client = Redis.from_url(
             self._settings.redis_url,
             encoding="utf-8",
             decode_responses=True,
         )
+        self._redis = redis_client
         state_store = RedisAccessionStateStore(
-            self._redis,
+            redis_client,
             key=self._settings.edgar_seen_accessions_key,
         )
         queue_publisher = RedisQueuePublisher(
-            self._redis, queue_name=self._settings.edgar_download_queue_name
+            redis_client,
+            queue_name=self._settings.edgar_download_queue_name,
         )
 
         # Open HTTP client lifespan
-        self._client_lifespan_token = await self._client_lifespan_cm.__aenter__()
+        await self._client_lifespan_cm.__aenter__()
+        self._client_lifespan_active = True
 
         # Global poller
+        global_feed_url = str(self._settings.edgar_global_feed_url)
         global_poller = Poller(
             name="global",
             interval_seconds=self._settings.edgar_global_poll_interval_seconds,
-            fetch_fn=lambda: self._feed_client.fetch_feed(self._settings.edgar_global_feed_url),
+            fetch_fn=lambda: self._feed_client.fetch_feed(global_feed_url),
             state_store=state_store,
             queue_publisher=queue_publisher,
         )
@@ -76,7 +80,7 @@ class IngestionService:
         if company_ciks:
             factory = CompanyPollerFactory(
                 feed_client=self._feed_client,
-                base_url=self._settings.edgar_company_feed_base_url,
+                base_url=str(self._settings.edgar_company_feed_base_url),
                 state_store=state_store,
                 queue_publisher=queue_publisher,
                 interval_seconds=self._settings.edgar_company_poll_interval_seconds,
@@ -91,9 +95,9 @@ class IngestionService:
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
 
-        if self._client_lifespan_token is not None:
+        if self._client_lifespan_active:
             await self._client_lifespan_cm.__aexit__(None, None, None)
-            self._client_lifespan_token = None
+            self._client_lifespan_active = False
 
         if self._redis is not None:
             await self._redis.aclose()

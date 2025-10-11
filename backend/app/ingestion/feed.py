@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from xml.etree import ElementTree as ET
 
 import httpx
@@ -56,13 +56,21 @@ class EdgarFeedClient:
         if not accession_number:
             return None
 
-        form_type = _attr(entry.find("atom:category", ATOM_NS), "term", default="UNKNOWN")
+        form_type = _attr(
+            entry.find("atom:category", ATOM_NS),
+            "term",
+            default="UNKNOWN",
+        ) or "UNKNOWN"
         filing_href = _attr(entry.find("atom:link", ATOM_NS), "href", default="")
+        if not filing_href:
+            return None
         updated_text = _text(entry.find("atom:updated", ATOM_NS))
-        filed_at = _parse_datetime(updated_text)
+        filed_at = _parse_datetime(updated_text) or datetime.now(UTC)
         cik = _derive_cik(filing_href) or _derive_cik_from_title(
             _text(entry.find("atom:title", ATOM_NS))
         )
+        if cik is None:
+            return None
 
         extra = {
             "summary": _text(entry.find("atom:summary", ATOM_NS)),
@@ -71,7 +79,7 @@ class EdgarFeedClient:
 
         return FilingFeedEntry(
             accession_number=accession_number,
-            cik=cik or "",
+            cik=cik,
             form_type=form_type,
             filing_href=filing_href,
             filed_at=filed_at,
@@ -113,13 +121,17 @@ class EdgarFeedClient:
 
         form_type = from_content("filing-type") or _attr(
             entry.find("atom:category", ATOM_NS), "term", default="UNKNOWN"
-        )
+        ) or "UNKNOWN"
         filing_href = from_content("filing-href") or _attr(
             entry.find("atom:link", ATOM_NS), "href", default=""
         )
+        if not filing_href:
+            return None
         filed_at = _parse_datetime(from_content("filing-date"))
         if filed_at is None:
             filed_at = _parse_datetime(_text(entry.find("atom:updated", ATOM_NS)))
+        if filed_at is None:
+            filed_at = datetime.now(UTC)
 
         extra = {
             "summary": _text(entry.find("atom:summary", ATOM_NS)),
@@ -131,7 +143,7 @@ class EdgarFeedClient:
             cik=cik or "",
             form_type=form_type,
             filing_href=filing_href,
-            filed_at=filed_at or datetime.utcnow(),
+            filed_at=filed_at,
             extra=extra,
         )
 

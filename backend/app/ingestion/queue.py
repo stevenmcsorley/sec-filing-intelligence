@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Awaitable
 from typing import Protocol
 
 from redis.asyncio import Redis
@@ -26,7 +27,9 @@ class RedisQueuePublisher:
 
     async def publish_download(self, task: DownloadTask) -> None:
         payload = json.dumps(task.to_payload())
-        await self._redis.rpush(self._queue_name, payload)
+        result = self._redis.rpush(self._queue_name, payload)
+        if isinstance(result, Awaitable):
+            await result
 
 
 class InMemoryQueuePublisher:
