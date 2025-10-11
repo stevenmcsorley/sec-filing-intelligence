@@ -14,6 +14,7 @@ from ..db import Base
 if TYPE_CHECKING:
     from .analysis import FilingAnalysis
     from .company import Company
+    from .diff import FilingDiff, FilingSectionDiff
     from .entity import FilingEntity
 
 
@@ -70,6 +71,18 @@ class Filing(Base):
     entities: Mapped[list[FilingEntity]] = relationship(
         "FilingEntity", back_populates="filing", cascade="all, delete-orphan"
     )
+    diff_from_previous: Mapped[FilingDiff | None] = relationship(
+        "FilingDiff",
+        back_populates="current_filing",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    diffs_as_previous: Mapped[list[FilingDiff]] = relationship(
+        "FilingDiff",
+        back_populates="previous_filing",
+        cascade="all, delete-orphan",
+        foreign_keys="FilingDiff.previous_filing_id",
+    )
 
     def __repr__(self) -> str:
         return (
@@ -117,6 +130,18 @@ class FilingSection(Base):
     )
     entities: Mapped[list[FilingEntity]] = relationship(
         "FilingEntity", back_populates="section", cascade="all, delete-orphan"
+    )
+    section_diffs: Mapped[list[FilingSectionDiff]] = relationship(
+        "FilingSectionDiff",
+        back_populates="current_section",
+        cascade="all, delete-orphan",
+        foreign_keys="FilingSectionDiff.current_section_id",
+    )
+    previous_section_diffs: Mapped[list[FilingSectionDiff]] = relationship(
+        "FilingSectionDiff",
+        back_populates="previous_section",
+        cascade="all, delete-orphan",
+        foreign_keys="FilingSectionDiff.previous_section_id",
     )
 
     def __repr__(self) -> str:

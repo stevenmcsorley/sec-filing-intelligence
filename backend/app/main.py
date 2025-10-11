@@ -7,8 +7,10 @@ from fastapi import FastAPI
 from .auth.router import router as auth_router
 from .config import get_settings
 from .db import close_db, init_db
+from .diff import DiffService
 from .downloader import DownloadService
 from .entities import EntityExtractionService
+from .filings import router as filings_router
 from .ingestion import IngestionService
 from .parsing import ParserService
 from .summarization import SectionSummaryService
@@ -30,12 +32,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await summary_service.start()
     entity_service = EntityExtractionService(settings)
     await entity_service.start()
+    diff_service = DiffService(settings)
+    await diff_service.start()
     state = cast(Any, app.state)
     state.ingestion_service = ingestion_service
     state.download_service = download_service
     state.parser_service = parser_service
     state.entity_service = entity_service
     state.summary_service = summary_service
+    state.diff_service = diff_service
     yield
     # Shutdown
     state = cast(Any, app.state)
@@ -52,6 +57,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     if current_entity_service is not None:
         await current_entity_service.stop()
+    current_diff_service = cast(DiffService | None, getattr(state, "diff_service", None))
+    if current_diff_service is not None:
+        await current_diff_service.stop()
     current_download_service = cast(
         DownloadService | None,
         getattr(state, "download_service", None),
@@ -76,6 +84,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(filings_router)
 
 
 @app.get("/health", tags=["health"])

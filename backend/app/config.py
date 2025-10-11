@@ -208,6 +208,39 @@ class Settings(BaseModel):
         default=float(os.getenv("ENTITY_BACKOFF_SECONDS", "2.0"))
     )
 
+    diff_enabled: bool = Field(default=os.getenv("DIFF_ENABLED", "true").lower() == "true")
+    diff_concurrency: int = Field(default=int(os.getenv("DIFF_CONCURRENCY", "2")))
+    diff_queue_name: str = Field(default=os.getenv("DIFF_QUEUE_NAME", "sec:groq:diff"))
+    diff_queue_visibility_timeout_seconds: int = Field(
+        default=int(os.getenv("DIFF_QUEUE_VISIBILITY_TIMEOUT_SECONDS", "600"))
+    )
+    diff_queue_requeue_batch_size: int = Field(
+        default=int(os.getenv("DIFF_QUEUE_REQUEUE_BATCH_SIZE", "200"))
+    )
+    diff_queue_pause_threshold: int = Field(
+        default=int(os.getenv("DIFF_QUEUE_PAUSE_THRESHOLD", "1000"))
+    )
+    diff_queue_resume_threshold: int = Field(
+        default=int(os.getenv("DIFF_QUEUE_RESUME_THRESHOLD", "750"))
+    )
+    diff_backpressure_check_interval_seconds: float = Field(
+        default=float(os.getenv("DIFF_BACKPRESSURE_CHECK_INTERVAL_SECONDS", "1.0"))
+    )
+    diff_model: str = Field(default=os.getenv("DIFF_MODEL", "llama-3.3-70b-versatile"))
+    diff_temperature: float = Field(
+        default=float(os.getenv("DIFF_TEMPERATURE", "0.2"))
+    )
+    diff_max_output_tokens: int = Field(
+        default=int(os.getenv("DIFF_MAX_OUTPUT_TOKENS", "512"))
+    )
+    diff_request_timeout: float = Field(
+        default=float(os.getenv("DIFF_REQUEST_TIMEOUT", "30"))
+    )
+    diff_max_retries: int = Field(default=int(os.getenv("DIFF_MAX_RETRIES", "3")))
+    diff_backoff_seconds: float = Field(
+        default=float(os.getenv("DIFF_BACKOFF_SECONDS", "2.0"))
+    )
+
     minio_endpoint: str = Field(default=os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
     minio_access_key: str = Field(default=os.getenv("MINIO_ACCESS_KEY", "filings"))
     minio_secret_key: str = Field(default=os.getenv("MINIO_SECRET_KEY", "filingsfilings"))
