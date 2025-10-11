@@ -108,6 +108,34 @@ class Settings(BaseModel):
         default=int(os.getenv("DOWNLOADER_REQUEUE_BATCH_SIZE", "100"))
     )
 
+    chunk_queue_name: str = Field(
+        default=os.getenv("CHUNK_QUEUE_NAME", "sec:groq:chunk")
+    )
+    chunk_queue_visibility_timeout_seconds: int = Field(
+        default=int(os.getenv("CHUNK_QUEUE_VISIBILITY_TIMEOUT_SECONDS", "600"))
+    )
+    chunk_queue_requeue_batch_size: int = Field(
+        default=int(os.getenv("CHUNK_QUEUE_REQUEUE_BATCH_SIZE", "200"))
+    )
+    chunk_queue_pause_threshold: int = Field(
+        default=int(os.getenv("CHUNK_QUEUE_PAUSE_THRESHOLD", "1000"))
+    )
+    chunk_queue_resume_threshold: int = Field(
+        default=int(os.getenv("CHUNK_QUEUE_RESUME_THRESHOLD", "750"))
+    )
+    chunk_backpressure_check_interval_seconds: float = Field(
+        default=float(os.getenv("CHUNK_BACKPRESSURE_CHECK_INTERVAL_SECONDS", "1.0"))
+    )
+    chunker_max_tokens_per_chunk: int = Field(
+        default=int(os.getenv("CHUNKER_MAX_TOKENS_PER_CHUNK", "800"))
+    )
+    chunker_min_tokens_per_chunk: int = Field(
+        default=int(os.getenv("CHUNKER_MIN_TOKENS_PER_CHUNK", "200"))
+    )
+    chunker_paragraph_overlap: int = Field(
+        default=int(os.getenv("CHUNKER_PARAGRAPH_OVERLAP", "1"))
+    )
+
     minio_endpoint: str = Field(default=os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
     minio_access_key: str = Field(default=os.getenv("MINIO_ACCESS_KEY", "filings"))
     minio_secret_key: str = Field(default=os.getenv("MINIO_SECRET_KEY", "filingsfilings"))
