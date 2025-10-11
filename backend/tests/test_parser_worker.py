@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -78,3 +79,33 @@ async def test_parser_worker_creates_sections(tmp_path: Path) -> None:
             await session.execute(select(FilingSection).where(FilingSection.filing_id == filing.id))
         ).scalars().all()
         assert len(sections) == 3
+
+
+@pytest.mark.asyncio
+async def test_parser_worker_run_handles_exceptions(tmp_path: Path) -> None:
+    session_factory = await _setup_session_factory()
+
+    triggered = asyncio.Event()
+
+    class FailingParserWorker(ParserWorker):
+        async def _handle_task(self, task: ParseTask) -> None:  # type: ignore[override]
+            triggered.set()
+            raise RuntimeError("boom")
+
+    queue = InMemoryParseQueue()
+    storage = LocalFilesystemStorageBackend(tmp_path)
+    worker = FailingParserWorker(
+        name="parser-failing",
+        queue=queue,
+        session_factory=session_factory,
+        fetcher=storage,
+        options=ParserOptions(max_retries=0, backoff_seconds=0),
+    )
+
+    await queue.push(ParseTask(accession_number="0000000000-00-000000"))
+    stop_event = asyncio.Event()
+    run_task = asyncio.create_task(worker.run(stop_event))
+    await asyncio.wait_for(triggered.wait(), timeout=1)
+    stop_event.set()
+    await asyncio.wait_for(run_task, timeout=1)
+    assert run_task.exception() is None

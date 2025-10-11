@@ -56,7 +56,23 @@ class ParserWorker:
             task = await self._queue.pop(timeout=5)
             if task is None:
                 continue
-            await self._handle_task(task)
+            try:
+                await self._handle_task(task)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                LOGGER.exception(
+                    "Parser worker crashed",
+                    extra={"worker": self._name, "accession": task.accession_number},
+                )
+                PARSER_ERRORS_TOTAL.labels("worker").inc()
+                try:
+                    await self._mark_failed(task)
+                except Exception:
+                    LOGGER.exception(
+                        "Failed to mark filing as failed after crash",
+                        extra={"worker": self._name, "accession": task.accession_number},
+                    )
 
     async def _handle_task(self, task: ParseTask) -> None:
         start = datetime.now(UTC)
