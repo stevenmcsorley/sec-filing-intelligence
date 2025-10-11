@@ -50,7 +50,7 @@ services:
       - secnet
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2024-09-27T15-23-35Z
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: filings

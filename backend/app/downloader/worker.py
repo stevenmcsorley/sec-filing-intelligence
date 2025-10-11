@@ -150,15 +150,14 @@ class DownloadWorker:
 
     async def _mark_failed(self, task: DownloadTask) -> None:
         async with self._session_factory() as session:
-            stmt = select(Filing).where(Filing.accession_number == task.accession_number)
-            result = await session.execute(stmt)
-            filing = result.scalar_one_or_none()
-            if filing is None:
-                async with session.begin():
+            async with session.begin():
+                stmt = select(Filing).where(Filing.accession_number == task.accession_number)
+                result = await session.execute(stmt)
+                filing = result.scalar_one_or_none()
+                if filing is None:
                     company = await self._get_or_create_company(session, task)
                     filing = await self._get_or_create_filing(session, company, task)
-            filing.status = FilingStatus.FAILED.value
-            await session.commit()
+                filing.status = FilingStatus.FAILED.value
 
     async def _persist_metadata(
         self,
