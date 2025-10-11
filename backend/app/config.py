@@ -86,6 +86,33 @@ class Settings(BaseModel):
         default=os.getenv("EDGAR_SEEN_ACCESSIONS_KEY", "sec:ingestion:seen-accessions")
     )
 
+    downloader_enabled: bool = Field(
+        default=os.getenv("DOWNLOADER_ENABLED", "true").lower() == "true"
+    )
+    downloader_concurrency: int = Field(
+        default=int(os.getenv("DOWNLOADER_CONCURRENCY", "2"))
+    )
+    downloader_max_retries: int = Field(
+        default=int(os.getenv("DOWNLOADER_MAX_RETRIES", "3"))
+    )
+    downloader_backoff_seconds: float = Field(
+        default=float(os.getenv("DOWNLOADER_BACKOFF_SECONDS", "1.5"))
+    )
+    downloader_request_timeout: float = Field(
+        default=float(os.getenv("DOWNLOADER_REQUEST_TIMEOUT", "30"))
+    )
+
+    minio_endpoint: str = Field(default=os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
+    minio_access_key: str = Field(default=os.getenv("MINIO_ACCESS_KEY", "filings"))
+    minio_secret_key: str = Field(default=os.getenv("MINIO_SECRET_KEY", "filingsfilings"))
+    minio_secure: bool = Field(
+        default=os.getenv("MINIO_SECURE", "false").lower() == "true"
+    )
+    minio_region: str | None = Field(default=os.getenv("MINIO_REGION"))
+    minio_filings_bucket: str = Field(
+        default=os.getenv("MINIO_FILINGS_BUCKET", "filings-raw")
+    )
+
     @property
     def keycloak_issuer(self) -> str:
         base_url = str(self.keycloak_server_url).rstrip("/")

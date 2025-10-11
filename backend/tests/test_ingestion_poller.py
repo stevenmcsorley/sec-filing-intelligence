@@ -57,6 +57,9 @@ async def test_poller_deduplicates_and_enqueues() -> None:
     assert len(queue.messages) == 3
     accession_numbers = {message["accession_number"] for message in queue.messages}
     assert accession_numbers == {"0001", "0002", "0003"}
+    for message in queue.messages:
+        assert "filed_at" in message
+        datetime.fromisoformat(message["filed_at"])
 
 
 @pytest.mark.asyncio

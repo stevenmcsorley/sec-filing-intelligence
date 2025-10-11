@@ -55,6 +55,13 @@ async def close_db() -> None:
         await _engine.dispose()
 
 
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    """Return the initialized async session factory."""
+    if _async_session_maker is None:
+        raise RuntimeError("Database has not been initialized. Call init_db first.")
+    return _async_session_maker
+
+
 async def get_db_session(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> AsyncGenerator[AsyncSession, None]:
