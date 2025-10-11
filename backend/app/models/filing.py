@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..db import Base
 
 if TYPE_CHECKING:
+    from .analysis import FilingAnalysis
     from .company import Company
 
 
@@ -62,6 +63,9 @@ class Filing(Base):
     sections: Mapped[list[FilingSection]] = relationship(
         "FilingSection", back_populates="filing", cascade="all, delete-orphan"
     )
+    analyses: Mapped[list[FilingAnalysis]] = relationship(
+        "FilingAnalysis", back_populates="filing", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return (
@@ -104,6 +108,9 @@ class FilingSection(Base):
 
     # Relationships
     filing: Mapped[Filing] = relationship("Filing", back_populates="sections")
+    analyses: Mapped[list[FilingAnalysis]] = relationship(
+        "FilingAnalysis", back_populates="section", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return (
