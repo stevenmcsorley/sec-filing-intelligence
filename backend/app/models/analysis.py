@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..db import Base
 
 if TYPE_CHECKING:  # pragma: no cover - typing aid only
+    from .diff import FilingSectionDiff
     from .entity import FilingEntity
     from .filing import Filing, FilingSection
 
@@ -62,6 +63,9 @@ class FilingAnalysis(Base):
     )
     entities: Mapped[list[FilingEntity]] = relationship(
         "FilingEntity", back_populates="analysis", cascade="all, delete-orphan"
+    )
+    section_diffs: Mapped[list[FilingSectionDiff]] = relationship(
+        "FilingSectionDiff", back_populates="analysis", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

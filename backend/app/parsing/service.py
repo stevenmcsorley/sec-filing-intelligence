@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.db import get_session_factory
+from app.diff.queue import DiffQueue, RedisDiffQueue
 from app.downloader.storage import MinioStorageBackend
 from app.ingestion.backpressure import QueueBackpressure
 from app.ingestion.models import ParseTask
@@ -32,6 +33,8 @@ class ParserService:
         self._chunk_backpressure: QueueBackpressure | None = None
         self._entity_queue: ChunkQueue | None = None
         self._entity_backpressure: QueueBackpressure | None = None
+        self._diff_queue: DiffQueue | None = None
+        self._diff_backpressure: QueueBackpressure | None = None
         self._chunk_planner: ChunkPlanner | None = None
         self._tasks: list[asyncio.Task[None]] = []
         self._stop_event = asyncio.Event()
@@ -107,6 +110,31 @@ class ParserService:
                 paragraph_overlap=self._settings.chunker_paragraph_overlap,
             )
         )
+        if self._settings.diff_enabled:
+            diff_redis = Redis.from_url(
+                self._settings.redis_url,
+                encoding="utf-8",
+                decode_responses=True,
+            )
+            self._diff_queue = RedisDiffQueue(
+                diff_redis,
+                self._settings.diff_queue_name,
+                visibility_timeout=self._settings.diff_queue_visibility_timeout_seconds,
+                requeue_batch_size=self._settings.diff_queue_requeue_batch_size,
+            )
+            if self._settings.diff_queue_pause_threshold > 0:
+                diff_resume = max(
+                    0,
+                    self._settings.diff_queue_resume_threshold
+                    or self._settings.diff_queue_pause_threshold // 2,
+                )
+                self._diff_backpressure = QueueBackpressure(
+                    diff_redis,
+                    self._settings.diff_queue_name,
+                    pause_threshold=self._settings.diff_queue_pause_threshold,
+                    resume_threshold=diff_resume,
+                    check_interval=self._settings.diff_backpressure_check_interval_seconds,
+                )
         self._storage = MinioStorageBackend(
             endpoint=self._settings.minio_endpoint,
             access_key=self._settings.minio_access_key,
@@ -148,6 +176,8 @@ class ParserService:
                 options=options,
                 chunk_targets=chunk_targets,
                 chunk_planner=self._chunk_planner,
+                diff_queue=self._diff_queue,
+                diff_backpressure=self._diff_backpressure,
             )
             task = asyncio.create_task(worker.run(self._stop_event))
             self._tasks.append(task)
@@ -173,6 +203,9 @@ class ParserService:
         if self._entity_queue is not None:
             await self._entity_queue.close()
             self._entity_queue = None
+        if self._diff_queue is not None:
+            await self._diff_queue.close()
+            self._diff_queue = None
         self._tasks.clear()
         self._started = False
         LOGGER.info("Parser service stopped")

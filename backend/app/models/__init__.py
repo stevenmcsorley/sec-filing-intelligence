@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .analysis import AnalysisType, FilingAnalysis
 from .company import Company
+from .diff import DiffStatus, FilingDiff, FilingSectionDiff
 from .entity import FilingEntity
 from .filing import Filing, FilingBlob, FilingSection, FilingStatus
 from .organization import Organization, Subscription, UserOrganization
@@ -17,6 +18,9 @@ __all__ = [
     "FilingSection",
     "FilingStatus",
     "FilingEntity",
+    "FilingDiff",
+    "FilingSectionDiff",
+    "DiffStatus",
     "Organization",
     "Subscription",
     "UserOrganization",
