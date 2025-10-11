@@ -23,6 +23,16 @@ class Settings(BaseModel):
     api_host: str = Field(default=os.getenv("API_HOST", "0.0.0.0"))
     api_port: int = Field(default=int(os.getenv("API_PORT", "8000")))
 
+    database_url: str = Field(
+        default=os.getenv(
+            "DATABASE_URL",
+            "postgresql+asyncpg://filings:filings@postgres:5432/filings",
+        )
+    )
+    database_echo: bool = Field(
+        default=os.getenv("DATABASE_ECHO", "false").lower() == "true"
+    )
+
     keycloak_server_url: AnyHttpUrl
     keycloak_realm: str
     keycloak_client_id: str
