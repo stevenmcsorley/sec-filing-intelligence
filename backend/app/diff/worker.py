@@ -305,13 +305,10 @@ class DiffWorker:
                     )
                 )
 
-                existing_analysis = (
-                    await session.execute(
-                        select(FilingAnalysis)
-                        .where(FilingAnalysis.job_id == task.job_id)
-                        .with_for_update()
-                    )
-                ).scalar_one_or_none()
+                analysis_stmt = select(FilingAnalysis).where(
+                    FilingAnalysis.job_id == task.job_id
+                )
+                existing_analysis = (await session.execute(analysis_stmt)).scalar_one_or_none()
 
                 analysis: FilingAnalysis | None = None
                 if analysis_result is not None:
