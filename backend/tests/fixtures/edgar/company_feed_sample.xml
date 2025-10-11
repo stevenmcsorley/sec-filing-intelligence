@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="ISO-8859-1" ?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <author>
+    <email>webmaster@example.com</email>
+    <name>Example Webmaster</name>
+  </author>
+  <company-info>
+    <cik>0000123456</cik>
+    <conformed-name>Example Holdings, Inc.</conformed-name>
+  </company-info>
+  <entry>
+    <category label="form type" scheme="https://www.sec.gov/" term="10-Q" />
+    <content type="text/xml">
+      <accession-number>0000123456-25-000210</accession-number>
+      <filing-type>10-Q</filing-type>
+      <filing-date>2025-02-10</filing-date>
+      <filing-href>https://www.sec.gov/Archives/edgar/data/1234567/000123456725000210/0001234567-25-000210-index.htm</filing-href>
+    </content>
+    <id>urn:tag:sec.gov,2008:accession-number=0000123456-25-000210</id>
+    <link href="https://www.sec.gov/Archives/edgar/data/1234567/000123456725000210/0001234567-25-000210-index.htm" rel="alternate" type="text/html" />
+    <summary type="html">
+      &lt;b&gt;Filed:&lt;/b&gt; 2025-02-10 &lt;b&gt;AccNo:&lt;/b&gt; 0000123456-25-000210 &lt;b&gt;Size:&lt;/b&gt; 120 KB
+    </summary>
+    <title>10-Q - Quarterly report</title>
+    <updated>2025-02-10T15:00:00-04:00</updated>
+  </entry>
+</feed>

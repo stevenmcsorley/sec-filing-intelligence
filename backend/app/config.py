@@ -19,6 +19,11 @@ def _parse_algorithms() -> list[str]:
     return [alg.strip() for alg in raw.split(",") if alg.strip()]
 
 
+def _parse_company_ciks() -> list[str]:
+    raw = os.getenv("EDGAR_COMPANY_CIKS", "")
+    return [token.strip() for token in raw.split(",") if token.strip()]
+
+
 class Settings(BaseModel):
     api_host: str = Field(default=os.getenv("API_HOST", "0.0.0.0"))
     api_port: int = Field(default=int(os.getenv("API_PORT", "8000")))
@@ -43,6 +48,43 @@ class Settings(BaseModel):
     keycloak_algorithms: list[str] = Field(default_factory=_parse_algorithms)
 
     opa_url: HttpUrl | None = Field(default=os.getenv("OPA_URL"))
+
+    redis_url: str = Field(default=os.getenv("REDIS_URL", "redis://redis:6379/0"))
+
+    edgar_polling_enabled: bool = Field(
+        default=os.getenv("EDGAR_POLLING_ENABLED", "true").lower() == "true"
+    )
+    edgar_user_agent: str = Field(
+        default=os.getenv(
+            "EDGAR_USER_AGENT",
+            "Mozilla/5.0 (compatible; sec-filing-intel/0.1; support@sec-intel.local)",
+        )
+    )
+    edgar_global_feed_url: AnyHttpUrl = Field(
+        default=os.getenv(
+            "EDGAR_GLOBAL_FEED_URL",
+            "https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&count=100&output=atom",
+        )
+    )
+    edgar_company_feed_base_url: AnyHttpUrl = Field(
+        default=os.getenv(
+            "EDGAR_COMPANY_FEED_BASE_URL",
+            "https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=",
+        )
+    )
+    edgar_global_poll_interval_seconds: int = Field(
+        default=int(os.getenv("EDGAR_GLOBAL_POLL_INTERVAL_SECONDS", "60"))
+    )
+    edgar_company_poll_interval_seconds: int = Field(
+        default=int(os.getenv("EDGAR_COMPANY_POLL_INTERVAL_SECONDS", "300"))
+    )
+    edgar_company_ciks: list[str] = Field(default_factory=_parse_company_ciks)
+    edgar_download_queue_name: str = Field(
+        default=os.getenv("EDGAR_DOWNLOAD_QUEUE_NAME", "sec:ingestion:download")
+    )
+    edgar_seen_accessions_key: str = Field(
+        default=os.getenv("EDGAR_SEEN_ACCESSIONS_KEY", "sec:ingestion:seen-accessions")
+    )
 
     @property
     def keycloak_issuer(self) -> str:

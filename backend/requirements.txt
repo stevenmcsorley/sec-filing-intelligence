@@ -6,3 +6,5 @@ PyJWT[crypto]==2.9.0
 sqlalchemy[asyncio]==2.0.32
 asyncpg==0.29.0
 alembic==1.13.2
+redis==5.0.7
+prometheus-client==0.20.0

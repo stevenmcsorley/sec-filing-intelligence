@@ -1,11 +1,13 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any, cast
 
 from fastapi import FastAPI
 
 from .auth.router import router as auth_router
 from .config import get_settings
 from .db import close_db, init_db
+from .ingestion import IngestionService
 
 
 @asynccontextmanager
@@ -14,8 +16,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     settings = get_settings()
     init_db(settings)
+    ingestion_service = IngestionService(settings)
+    await ingestion_service.start()
+    state = cast(Any, app.state)
+    state.ingestion_service = ingestion_service
     yield
     # Shutdown
+    state = cast(Any, app.state)
+    service = getattr(state, "ingestion_service", None)
+    if service is not None:
+        await service.stop()
     await close_db()
 
 
