@@ -49,6 +49,11 @@ The helper script imports `ops/keycloak/realm-export/sec-intel-realm.json` using
 
 FastAPI exposes `/auth/health` for checking the discovery endpoint and `/auth/me` for basic token introspection once Keycloak is running.
 
+> **Production Reminder:** Never ship with hardcoded or mock values for user
+> subscription tiers, organization IDs, or authorization decisions. Replace the
+> temporary stubs documented in `backend/app/auth/router.py` ([TRELLO-004]) with
+> real data sources (Keycloak claims/DB) before any production release.
+
 ## Continuous Integration
 
 GitHub Actions enforces linting, type-checking, and unit tests for both frontend and backend. Branch protection on `main` requires PR reviews and passing CI before merge (see Trello card `[TRELLO-001]`).

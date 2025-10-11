@@ -15,7 +15,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def token_to_user_context(token: TokenContext) -> dict[str, Any]:
     """Convert TokenContext to OPA user context format.
 
-    TODO [TRELLO-004]: Replace hardcoded values with real data:
+    TODO [TRELLO-004]: Replace hardcoded values with real data (NO mock/hardcoded
+    values in production):
     - subscription.tier: Query user's subscription from DB (users/subscriptions table)
     - org_id: Extract from Keycloak token custom claims (groups/org membership)
 
