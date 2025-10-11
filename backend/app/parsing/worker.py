@@ -14,8 +14,12 @@ import pdfminer.high_level
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.ingestion.backpressure import QueueBackpressure
 from app.ingestion.models import ParseTask
 from app.models.filing import Filing, FilingBlob, FilingSection, FilingStatus
+from app.orchestration.metrics import CHUNK_PLANNER_CHUNKS_TOTAL, CHUNK_PLANNER_LATENCY_SECONDS
+from app.orchestration.planner import ChunkPlanner, ChunkPlannerOptions, PlannerSection
+from app.orchestration.queue import ChunkQueue
 
 from .metrics import PARSER_ERRORS_TOTAL, PARSER_LATENCY_SECONDS, PARSER_SECTIONS_TOTAL
 from .queue import ParseQueue
@@ -44,12 +48,21 @@ class ParserWorker:
         session_factory: async_sessionmaker[AsyncSession],
         fetcher: ArtifactFetcher,
         options: ParserOptions,
+        chunk_queue: ChunkQueue | None = None,
+        chunk_planner: ChunkPlanner | None = None,
+        chunk_backpressure: QueueBackpressure | None = None,
+        chunk_options: ChunkPlannerOptions | None = None,
     ) -> None:
         self._name = name
         self._queue = queue
         self._session_factory = session_factory
         self._fetcher = fetcher
         self._options = options
+        self._chunk_queue = chunk_queue
+        self._chunk_planner = chunk_planner or (
+            ChunkPlanner(chunk_options) if chunk_queue else None
+        )
+        self._chunk_backpressure = chunk_backpressure
 
     async def run(self, stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
@@ -84,14 +97,25 @@ class ParserWorker:
             await self._mark_failed(task)
             return
 
+        planner_sections: list[PlannerSection] = []
+        form_type: str | None = None
+
         async with self._session_factory() as session:
             async with session.begin():
                 stmt = select(Filing).where(Filing.accession_number == task.accession_number)
                 filing = (await session.execute(stmt)).scalar_one()
+                form_type = filing.form_type
                 await session.execute(
                     delete(FilingSection).where(FilingSection.filing_id == filing.id)
                 )
                 for ordinal, section in enumerate(sections, start=1):
+                    planner_sections.append(
+                        PlannerSection(
+                            ordinal=ordinal,
+                            title=section.title,
+                            content=section.content,
+                        )
+                    )
                     session.add(
                         FilingSection(
                             filing_id=filing.id,
@@ -102,6 +126,20 @@ class ParserWorker:
                     )
                 filing.status = FilingStatus.PARSED.value
             PARSER_SECTIONS_TOTAL.inc(len(sections))
+
+        if self._chunk_queue and self._chunk_planner and planner_sections:
+            if self._chunk_backpressure is not None:
+                await self._chunk_backpressure.wait_if_needed()
+            plan_start = datetime.now(UTC)
+            jobs = self._chunk_planner.plan(task.accession_number, planner_sections)
+            CHUNK_PLANNER_LATENCY_SECONDS.observe(
+                (datetime.now(UTC) - plan_start).total_seconds()
+            )
+            if form_type is None:
+                form_type = "unknown"
+            CHUNK_PLANNER_CHUNKS_TOTAL.labels(form_type).inc(len(jobs))
+            for job in jobs:
+                await self._chunk_queue.push(job)
         PARSER_LATENCY_SECONDS.observe((datetime.now(UTC) - start).total_seconds())
 
     async def _mark_failed(self, task: ParseTask) -> None:

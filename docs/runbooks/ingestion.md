@@ -74,6 +74,7 @@ Downloader workers log each failure with accession number and artifact metadata.
 - The deduplication set can be cleared (e.g., in staging) by deleting the Redis key defined in `EDGAR_SEEN_ACCESSIONS_KEY`.
 - Download workers consume JSON payloads produced by the pollers via `RedisDownloadQueue`. Payload schema includes `accession_number`, `cik`, `form_type`, `filing_href`, and `filed_at` (ISO-8601). The queue maintains Redis keys for dedupe (`<queue>:dedupe`) and in-flight tracking (`<queue>:processing*`); avoid manipulating them manually unless reprocessing.
 - MinIO bucket policies and lifecycle configuration are stored under `ops/minio/`. Apply them after creating the `filings-raw` bucket: `mc admin bucket remote add` etc.
+- For downstream Groq processing queue configuration, see `docs/runbooks/orchestration.md`.
 
 ### Reprocessing a Filing
 

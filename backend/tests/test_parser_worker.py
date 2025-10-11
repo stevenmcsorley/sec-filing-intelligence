@@ -11,6 +11,8 @@ from app.downloader.storage import LocalFilesystemStorageBackend
 from app.ingestion.models import ParseTask
 from app.models.company import Company
 from app.models.filing import BlobKind, Filing, FilingBlob, FilingSection, FilingStatus
+from app.orchestration.planner import ChunkPlanner, ChunkPlannerOptions
+from app.orchestration.queue import InMemoryChunkQueue
 from app.parsing.queue import InMemoryParseQueue
 from app.parsing.worker import ParserOptions, ParserWorker
 from sqlalchemy import select
@@ -61,12 +63,18 @@ async def test_parser_worker_creates_sections(tmp_path: Path) -> None:
     storage = LocalFilesystemStorageBackend(tmp_path)
     queue = InMemoryParseQueue()
     options = ParserOptions(max_retries=1, backoff_seconds=0)
+    chunk_queue = InMemoryChunkQueue()
+    chunk_planner = ChunkPlanner(
+        ChunkPlannerOptions(max_tokens_per_chunk=400, min_tokens_per_chunk=150)
+    )
     worker = ParserWorker(
         name="parser-test",
         queue=queue,
         session_factory=session_factory,
         fetcher=storage,
         options=options,
+        chunk_queue=chunk_queue,
+        chunk_planner=chunk_planner,
     )
 
     await worker._handle_task(ParseTask(accession_number="0001234567-25-000001"))  # type: ignore[attr-defined]
@@ -79,6 +87,12 @@ async def test_parser_worker_creates_sections(tmp_path: Path) -> None:
             await session.execute(select(FilingSection).where(FilingSection.filing_id == filing.id))
         ).scalars().all()
         assert len(sections) == 3
+
+    message = await chunk_queue.pop(timeout=1)
+    assert message is not None
+    assert message.task.accession_number == "0001234567-25-000001"
+    assert message.task.content
+    await chunk_queue.ack(message)
 
 
 @pytest.mark.asyncio
