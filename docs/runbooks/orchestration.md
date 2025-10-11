@@ -44,3 +44,13 @@ Environment variables (see `config/backend.env.example`):
   redis-cli rpush ${CHUNK_QUEUE_NAME} '{"job_id":"<JOB_ID>", ... }'
   ```
 - Tests covering chunk planner (`backend/tests/test_chunk_planner.py`) and queue semantics (`backend/tests/test_chunk_queue.py`) should be updated whenever heuristics or payload shape changes.
+
+## Section Summaries Worker
+
+- `SectionSummaryService` consumes chunk jobs and calls Groq chat completions to produce bullet summaries per section chunk.
+- Successful completions are persisted in `filing_analyses` with `analysis_type = section_chunk_summary`; tokens consumed feed the `sec_section_summary_tokens_total` counter.
+- Retryable provider errors (429/5xx/timeouts) leave the message unacked so Redis requeues after the visibility timeout; fatal 4xx errors are acknowledged and logged.
+- Metrics of interest:
+  - `sec_section_summary_latency_seconds{model}`
+  - `sec_section_summary_errors_total{stage}`
+  - `sec_section_summary_completions_total{model}`

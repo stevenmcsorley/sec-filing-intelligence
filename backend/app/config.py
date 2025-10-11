@@ -136,6 +136,35 @@ class Settings(BaseModel):
         default=int(os.getenv("CHUNKER_PARAGRAPH_OVERLAP", "1"))
     )
 
+    groq_api_key: str | None = Field(default=os.getenv("GROQ_API_KEY"))
+    groq_api_url: AnyHttpUrl = Field(
+        default=os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
+    )
+    summarizer_enabled: bool = Field(
+        default=os.getenv("SUMMARIZER_ENABLED", "true").lower() == "true"
+    )
+    summarizer_concurrency: int = Field(
+        default=int(os.getenv("SUMMARIZER_CONCURRENCY", "2"))
+    )
+    summarizer_model: str = Field(
+        default=os.getenv("SUMMARIZER_MODEL", "mixtral-8x7b-32768")
+    )
+    summarizer_temperature: float = Field(
+        default=float(os.getenv("SUMMARIZER_TEMPERATURE", "0.2"))
+    )
+    summarizer_max_output_tokens: int = Field(
+        default=int(os.getenv("SUMMARIZER_MAX_OUTPUT_TOKENS", "256"))
+    )
+    summarizer_request_timeout: float = Field(
+        default=float(os.getenv("SUMMARIZER_REQUEST_TIMEOUT", "30"))
+    )
+    summarizer_max_retries: int = Field(
+        default=int(os.getenv("SUMMARIZER_MAX_RETRIES", "3"))
+    )
+    summarizer_backoff_seconds: float = Field(
+        default=float(os.getenv("SUMMARIZER_BACKOFF_SECONDS", "2.0"))
+    )
+
     minio_endpoint: str = Field(default=os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
     minio_access_key: str = Field(default=os.getenv("MINIO_ACCESS_KEY", "filings"))
     minio_secret_key: str = Field(default=os.getenv("MINIO_SECRET_KEY", "filingsfilings"))

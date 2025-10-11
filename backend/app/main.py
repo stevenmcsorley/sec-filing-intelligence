@@ -10,6 +10,7 @@ from .db import close_db, init_db
 from .downloader import DownloadService
 from .ingestion import IngestionService
 from .parsing import ParserService
+from .summarization import SectionSummaryService
 
 
 @asynccontextmanager
@@ -24,16 +25,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await download_service.start()
     parser_service = ParserService(settings)
     await parser_service.start()
+    summary_service = SectionSummaryService(settings)
+    await summary_service.start()
     state = cast(Any, app.state)
     state.ingestion_service = ingestion_service
     state.download_service = download_service
     state.parser_service = parser_service
+    state.summary_service = summary_service
     yield
     # Shutdown
     state = cast(Any, app.state)
     current_parser_service = cast(ParserService | None, getattr(state, "parser_service", None))
     if current_parser_service is not None:
         await current_parser_service.stop()
+    current_summary_service = cast(
+        SectionSummaryService | None, getattr(state, "summary_service", None)
+    )
+    if current_summary_service is not None:
+        await current_summary_service.stop()
     current_download_service = cast(
         DownloadService | None,
         getattr(state, "download_service", None),

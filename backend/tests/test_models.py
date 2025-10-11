@@ -8,7 +8,9 @@ import pytest
 from app.models import (
     Company,
     Filing,
+    FilingAnalysis,
     FilingBlob,
+    FilingSection,
     Organization,
     Subscription,
     UserOrganization,
@@ -221,3 +223,56 @@ async def test_unique_constraints(db_session: AsyncSession) -> None:
 
     with pytest.raises(IntegrityError):
         await db_session.flush()  # Use flush instead of commit to trigger the error
+
+
+@pytest.mark.asyncio
+async def test_filing_analysis_links_section(db_session: AsyncSession) -> None:
+    """Ensure analyses can be persisted for a filing section."""
+    company = Company(cik="0009876543", name="Example Analytics Corp")
+    db_session.add(company)
+    await db_session.flush()
+
+    filing = Filing(
+        company_id=company.id,
+        cik=company.cik,
+        form_type="10-Q",
+        filed_at=datetime.now(UTC),
+        accession_number="0009876543-25-000010",
+        source_urls='["https://example.com/q"]',
+        status="parsed",
+    )
+    db_session.add(filing)
+    await db_session.flush()
+
+    section = FilingSection(
+        filing_id=filing.id,
+        title="Management Discussion",
+        ordinal=1,
+        content="Detailed discussion of quarterly performance.",
+    )
+    db_session.add(section)
+    await db_session.flush()
+
+    analysis = FilingAnalysis(
+        job_id="0009876543-25-000010:1:0",
+        filing_id=filing.id,
+        section_id=section.id,
+        chunk_index=0,
+        analysis_type="section_chunk_summary",
+        model="mixtral-8x7b-32768",
+        content="- Strong revenue growth noted.",
+        prompt_tokens=500,
+        completion_tokens=120,
+        total_tokens=620,
+    )
+    db_session.add(analysis)
+    await db_session.commit()
+
+    result = await db_session.execute(
+        select(Filing)
+        .where(Filing.id == filing.id)
+        .options(selectinload(Filing.analyses), selectinload(Filing.sections))
+    )
+    loaded = result.scalar_one()
+    assert len(loaded.analyses) == 1
+    assert loaded.analyses[0].section_id == section.id
