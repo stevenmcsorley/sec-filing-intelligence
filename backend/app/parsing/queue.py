@@ -30,11 +30,16 @@ class RedisParseQueue:
 
     async def push(self, task: ParseTask) -> None:
         payload = json.dumps(task.to_payload())
-        await self._redis.rpush(self._queue_name, payload)
+        result = self._redis.rpush(self._queue_name, payload)
+        if isinstance(result, Awaitable):
+            await result
 
     async def pop(self, timeout: int = 5) -> ParseTask | None:
         raw = self._redis.blpop([self._queue_name], timeout=timeout)
-        result = await cast(Awaitable[list[str] | None], raw)
+        if isinstance(raw, Awaitable):
+            result = await cast(Awaitable[list[str] | None], raw)
+        else:
+            result = cast(list[str] | None, raw)
         if result is None:
             return None
         _, payload = result

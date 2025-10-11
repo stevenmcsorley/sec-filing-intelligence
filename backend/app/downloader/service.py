@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import cast
 
 import httpx
 from redis.asyncio import Redis
@@ -81,15 +82,32 @@ class DownloadService:
             request_timeout=self._settings.downloader_request_timeout,
         )
 
+        queue = self._queue
+        if queue is None:
+            raise RuntimeError("Download queue not initialized")
+        storage = self._storage
+        if storage is None:
+            raise RuntimeError("Storage backend not initialized")
+        http_client = self._http_client
+        if http_client is None:
+            raise RuntimeError("HTTP client not initialized")
+        session_factory = self._session_factory
+        if session_factory is None:
+            raise RuntimeError("Session factory not initialized")
+        parse_queue = self._parse_queue
+        if parse_queue is None:
+            raise RuntimeError("Parse queue not initialized")
+        parse_queue = cast(ParseQueue, parse_queue)
+
         for index in range(self._settings.downloader_concurrency):
             worker = DownloadWorker(
                 name=f"downloader-{index}",
-                queue=self._queue,
-                session_factory=self._session_factory,
-                storage=self._storage,
-                http_client=self._http_client,
+                queue=queue,
+                session_factory=session_factory,
+                storage=storage,
+                http_client=http_client,
                 options=options,
-                parse_queue=self._parse_queue,
+                parse_queue=parse_queue,
             )
             task = asyncio.create_task(worker.run(self._stop_event))
             self._tasks.append(task)
@@ -123,11 +141,13 @@ class DownloadService:
         LOGGER.info("Downloader service stopped")
 
     async def enqueue(self, task: DownloadTask) -> None:
-        if self._queue is None:
+        queue = self._queue
+        if queue is None:
             raise RuntimeError("Downloader service not started")
-        await self._queue.push(task)
+        await queue.push(task)
 
     async def enqueue_for_parse(self, accession_number: str) -> None:
-        if self._parse_queue is None:
+        parse_queue = self._parse_queue
+        if parse_queue is None:
             raise RuntimeError("Downloader service not started")
-        await self._parse_queue.push(ParseTask(accession_number=accession_number))
+        await parse_queue.push(ParseTask(accession_number=accession_number))

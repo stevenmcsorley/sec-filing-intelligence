@@ -15,6 +15,9 @@ from app.ingestion.models import DownloadTask
 class DownloadQueue(Protocol):
     """Protocol to pop download tasks."""
 
+    async def push(self, task: DownloadTask) -> None:
+        """Push a download task onto the queue."""
+
     async def pop(self, timeout: int = 5) -> DownloadTask | None:
         """Pop a task, waiting up to `timeout` seconds."""
 
@@ -22,16 +25,25 @@ class DownloadQueue(Protocol):
         """Close the queue and release resources."""
 
 
-class RedisDownloadQueue:
+class RedisDownloadQueue(DownloadQueue):
     """Queue implementation backed by Redis BLPOP."""
 
     def __init__(self, redis: Redis, queue_name: str) -> None:
         self._redis = redis
         self._queue_name = queue_name
 
+    async def push(self, task: DownloadTask) -> None:
+        payload = json.dumps(task.to_payload())
+        result = self._redis.rpush(self._queue_name, payload)
+        if isinstance(result, Awaitable):
+            await result
+
     async def pop(self, timeout: int = 5) -> DownloadTask | None:
         raw = self._redis.blpop([self._queue_name], timeout=timeout)
-        result = await cast(Awaitable[list[str] | None], raw)
+        if isinstance(raw, Awaitable):
+            result = await cast(Awaitable[list[str] | None], raw)
+        else:
+            result = cast(list[str] | None, raw)
         if result is None:
             return None
         _, payload = result
@@ -42,7 +54,7 @@ class RedisDownloadQueue:
         await self._redis.close()
 
 
-class InMemoryDownloadQueue:
+class InMemoryDownloadQueue(DownloadQueue):
     """Async in-memory queue for tests."""
 
     def __init__(self) -> None:
