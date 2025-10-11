@@ -17,6 +17,7 @@ from app.models import (
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 
 @pytest.mark.asyncio
@@ -94,8 +95,10 @@ async def test_filing_with_blobs(db_session: AsyncSession) -> None:
     db_session.add_all([blob_raw, blob_text])
     await db_session.commit()
 
-    # Query back
-    result = await db_session.execute(select(Filing).where(Filing.id == filing.id))
+    # Query back with eager loading
+    result = await db_session.execute(
+        select(Filing).where(Filing.id == filing.id).options(selectinload(Filing.blobs))
+    )
     filing_loaded = result.scalar_one()
     assert len(filing_loaded.blobs) == 2
     assert {b.kind for b in filing_loaded.blobs} == {"raw", "text"}
@@ -121,9 +124,11 @@ async def test_organization_with_subscription(db_session: AsyncSession) -> None:
     db_session.add(subscription)
     await db_session.commit()
 
-    # Query back
+    # Query back with eager loading
     result = await db_session.execute(
-        select(Organization).where(Organization.slug == "test-org")
+        select(Organization)
+        .where(Organization.slug == "test-org")
+        .options(selectinload(Organization.subscription))
     )
     org_loaded = result.scalar_one()
     assert org_loaded.subscription is not None
@@ -190,8 +195,12 @@ async def test_watchlist_with_items(db_session: AsyncSession) -> None:
     db_session.add_all(items)
     await db_session.commit()
 
-    # Query back
-    result = await db_session.execute(select(Watchlist).where(Watchlist.id == watchlist.id))
+    # Query back with eager loading
+    result = await db_session.execute(
+        select(Watchlist)
+        .where(Watchlist.id == watchlist.id)
+        .options(selectinload(Watchlist.items))
+    )
     watchlist_loaded = result.scalar_one()
     assert len(watchlist_loaded.items) == 3
     assert {item.ticker for item in watchlist_loaded.items} == {"AAPL", "MSFT", "GOOGL"}
@@ -200,15 +209,15 @@ async def test_watchlist_with_items(db_session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_unique_constraints(db_session: AsyncSession) -> None:
     """Test that unique constraints are enforced."""
+    from sqlalchemy.exc import IntegrityError
+
     company1 = Company(cik="0001111111", name="Company A")
     db_session.add(company1)
     await db_session.commit()
 
     # Try to create another company with same CIK
-    from sqlalchemy.exc import IntegrityError
-
     company2 = Company(cik="0001111111", name="Company B")
     db_session.add(company2)
 
     with pytest.raises(IntegrityError):
-        await db_session.commit()
+        await db_session.flush()  # Use flush instead of commit to trigger the error
