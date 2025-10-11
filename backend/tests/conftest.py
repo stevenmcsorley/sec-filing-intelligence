@@ -51,10 +51,17 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         try:
             yield session
-            await session.commit()
         except Exception:
+            # Test raised an exception, rollback
             await session.rollback()
             raise
+        else:
+            # Test completed successfully, try to commit
+            try:
+                await session.commit()
+            except Exception:
+                # Commit failed (e.g., transaction already rolled back in test)
+                await session.rollback()
 
     # Cleanup
     await engine.dispose()
