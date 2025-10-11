@@ -81,6 +81,8 @@ class Poller:
                     cik=entry.cik,
                     form_type=entry.form_type,
                     filing_href=entry.filing_href,
+                    filed_at=entry.filed_at,
+                    summary=(entry.extra or {}).get("summary") if entry.extra else None,
                 )
             )
 

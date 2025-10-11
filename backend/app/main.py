@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from .auth.router import router as auth_router
 from .config import get_settings
 from .db import close_db, init_db
+from .downloader import DownloadService
 from .ingestion import IngestionService
 
 
@@ -18,14 +19,26 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     init_db(settings)
     ingestion_service = IngestionService(settings)
     await ingestion_service.start()
+    download_service = DownloadService(settings)
+    await download_service.start()
     state = cast(Any, app.state)
     state.ingestion_service = ingestion_service
+    state.download_service = download_service
     yield
     # Shutdown
     state = cast(Any, app.state)
-    service = getattr(state, "ingestion_service", None)
-    if service is not None:
-        await service.stop()
+    current_download_service = cast(
+        DownloadService | None,
+        getattr(state, "download_service", None),
+    )
+    if current_download_service is not None:
+        await current_download_service.stop()
+    current_ingestion_service = cast(
+        IngestionService | None,
+        getattr(state, "ingestion_service", None),
+    )
+    if current_ingestion_service is not None:
+        await current_ingestion_service.stop()
     await close_db()
 
 

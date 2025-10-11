@@ -36,7 +36,7 @@ class InMemoryQueuePublisher:
     """In-memory queue used for tests."""
 
     def __init__(self) -> None:
-        self.messages: list[dict[str, str]] = []
+        self.messages: list[dict[str, object]] = []
 
     async def publish_download(self, task: DownloadTask) -> None:
         self.messages.append(task.to_payload())

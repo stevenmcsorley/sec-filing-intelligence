@@ -31,6 +31,7 @@ class BlobKind(str, Enum):
     RAW = "raw"  # Original HTML/PDF/TXT
     TEXT = "text"  # Cleaned text
     SECTIONS = "sections"  # Sectionized JSON
+    INDEX = "index"  # Filing index page
 
 
 class Filing(Base):
@@ -51,6 +52,7 @@ class Filing(Base):
     status: Mapped[str] = mapped_column(
         String(20), default=FilingStatus.PENDING.value, index=True, nullable=False
     )
+    downloaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
     company: Mapped[Company] = relationship("Company", back_populates="filings")
@@ -77,6 +79,8 @@ class FilingBlob(Base):
     filing_id: Mapped[int] = mapped_column(ForeignKey("filings.id"), nullable=False)
     kind: Mapped[str] = mapped_column(String(20), nullable=False)
     location: Mapped[str] = mapped_column(Text, nullable=False)  # s3://bucket/key or minio URL
+    checksum: Mapped[str | None] = mapped_column(String(64), index=True)
+    content_type: Mapped[str | None] = mapped_column(String(100))
 
     # Relationships
     filing: Mapped[Filing] = relationship("Filing", back_populates="blobs")

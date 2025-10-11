@@ -8,3 +8,4 @@ asyncpg==0.29.0
 alembic==1.13.2
 redis==5.0.7
 prometheus-client==0.20.0
+minio==7.2.6
