@@ -2,7 +2,7 @@ import sys
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-import pytest
+import pytest_asyncio
 from app.db import Base
 
 # Import models to register them with Base.metadata
@@ -24,7 +24,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create a test database session with in-memory SQLite.
 
