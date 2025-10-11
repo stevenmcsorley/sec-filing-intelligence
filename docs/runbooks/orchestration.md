@@ -13,7 +13,7 @@ Workers downstream can consume these jobs reliably thanks to dedupe keys and vis
 
 ## Configuration
 
-Environment variables (see `config/backend.env.example`):
+Environment variables (see `config/backend.env.example`; overrides can be placed in `config/backend.env` which docker compose loads after the example file):
 
 | Variable | Description | Default |
 | --- | --- | --- |
