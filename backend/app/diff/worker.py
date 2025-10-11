@@ -341,7 +341,7 @@ class DiffWorker:
                             impact=change["impact"],
                             confidence=change.get("confidence"),
                             evidence=change.get("evidence"),
-                            metadata=metadata_json,
+                        metadata_json=metadata_json,
                         )
                     )
 

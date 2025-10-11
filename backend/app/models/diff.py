@@ -103,7 +103,9 @@ class FilingSectionDiff(Base):
     impact: Mapped[str] = mapped_column(String(16), nullable=False)
     confidence: Mapped[float | None] = mapped_column(nullable=True)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
-    metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(
+        "metadata", Text, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, nullable=False
     )
