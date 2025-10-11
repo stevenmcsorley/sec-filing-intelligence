@@ -31,6 +31,7 @@ These commands invoke scripts under `scripts/ci/` and must pass before requestin
 ## Environment & Auth Bootstrap
 
 - Copy `config/backend.env.example` and `config/keycloak.env.example` to `.env` counterparts before running Docker Compose.
+- Populate secrets (e.g., `GROQ_API_KEY`) in `config/backend.env`. The compose stack now loads both the example and real files, so anything defined in `backend.env` will override the checked-in defaults without leaking secrets to Git.
 - After the stack is up (`docker compose -f ops/compose/docker-compose.yml up -d`), import the Keycloak realm:
   ```bash
   ./ops/keycloak/seed-realm.sh
