@@ -64,9 +64,10 @@ class DownloadWorker:
 
     async def run(self, stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
-            task = await self._queue.pop(timeout=5)
-            if task is None:
+            message = await self._queue.pop(timeout=5)
+            if message is None:
                 continue
+            task = message.task
             try:
                 await self._handle_task(task)
             except Exception:  # pragma: no cover - defensive logging
@@ -74,6 +75,14 @@ class DownloadWorker:
                     "Download worker crashed",
                     extra={"accession": task.accession_number},
                 )
+            finally:
+                try:
+                    await self._queue.ack(message)
+                except Exception:  # pragma: no cover - defensive logging
+                    LOGGER.exception(
+                        "Failed to acknowledge download task",
+                        extra={"accession": task.accession_number},
+                    )
 
     async def _handle_task(self, task: DownloadTask) -> None:
         artifacts = self._build_artifacts(task)

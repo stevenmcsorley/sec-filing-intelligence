@@ -19,6 +19,9 @@ Environment variables (set in `config/backend.env`):
 | `EDGAR_COMPANY_CIKS` | Comma-separated list of CIKs to poll individually. | (empty) |
 | `EDGAR_DOWNLOAD_QUEUE_NAME` | Redis list used for download tasks. | `sec:ingestion:download` |
 | `EDGAR_SEEN_ACCESSIONS_KEY` | Redis set used for accession deduplication. | `sec:ingestion:seen-accessions` |
+| `EDGAR_DOWNLOAD_QUEUE_PAUSE_THRESHOLD` | Queue depth threshold that pauses pollers. (`0` disables.) | `500` |
+| `EDGAR_DOWNLOAD_QUEUE_RESUME_THRESHOLD` | Queue depth that resumes pollers once backlog drops. | `350` |
+| `EDGAR_BACKPRESSURE_CHECK_INTERVAL_SECONDS` | Sleep interval while backpressure is active. | `1.0` |
 
 Redis connectivity is configured via `REDIS_URL` (defaults to `redis://redis:6379/0`).
 
@@ -31,6 +34,8 @@ Redis connectivity is configured via `REDIS_URL` (defaults to `redis://redis:637
 | `DOWNLOADER_MAX_RETRIES` | Retry attempts per artifact before marking failed. | `3` |
 | `DOWNLOADER_BACKOFF_SECONDS` | Initial exponential backoff in seconds. | `1.5` |
 | `DOWNLOADER_REQUEST_TIMEOUT` | HTTP request timeout in seconds. | `30` |
+| `DOWNLOADER_VISIBILITY_TIMEOUT_SECONDS` | Visibility timeout before tasks are requeued. | `60` |
+| `DOWNLOADER_REQUEUE_BATCH_SIZE` | Maximum expired tasks reclaimed per sweep. | `100` |
 | `MINIO_ENDPOINT` | MinIO endpoint (include scheme). | `http://minio:9000` |
 | `MINIO_ACCESS_KEY` | MinIO access key. | `filings` |
 | `MINIO_SECRET_KEY` | MinIO secret key. | `filingsfilings` |
@@ -45,6 +50,8 @@ Prometheus metrics emitted by the pollers:
 - `sec_ingestion_feed_fetch_latency_seconds{feed_kind}` — Histogram of feed fetch latency.
 - `sec_ingestion_new_filings_total{feed_kind,form_type}` — Counter of newly discovered filings.
 - `sec_ingestion_poll_errors_total{feed_kind}` — Counter of errors while polling feeds. `feed_kind="fatal"` indicates an unexpected crash in the polling loop.
+- `sec_ingestion_queue_depth{queue_name}` — Gauge of current backlog depth for ingestion queues.
+- `sec_ingestion_backpressure_events_total{queue_name,event}` — Counter for `pause`/`resume` transitions triggered by backpressure.
 
 These metrics are registered automatically when the ingestion service starts. They appear on the default Prometheus registry; expose them via the metrics endpoint configured in the observability stack.
 
@@ -65,7 +72,7 @@ Downloader workers log each failure with accession number and artifact metadata.
 - Always run with a valid SEC-compliant `User-Agent`. Requests without it will be throttled.
 - To pause ingestion temporarily, set `EDGAR_POLLING_ENABLED=false` and restart the backend service.
 - The deduplication set can be cleared (e.g., in staging) by deleting the Redis key defined in `EDGAR_SEEN_ACCESSIONS_KEY`.
-- Download workers consume JSON payloads produced by the pollers via `RedisDownloadQueue`. Payload schema includes `accession_number`, `cik`, `form_type`, `filing_href`, and `filed_at` (ISO-8601).
+- Download workers consume JSON payloads produced by the pollers via `RedisDownloadQueue`. Payload schema includes `accession_number`, `cik`, `form_type`, `filing_href`, and `filed_at` (ISO-8601). The queue maintains Redis keys for dedupe (`<queue>:dedupe`) and in-flight tracking (`<queue>:processing*`); avoid manipulating them manually unless reprocessing.
 - MinIO bucket policies and lifecycle configuration are stored under `ops/minio/`. Apply them after creating the `filings-raw` bucket: `mc admin bucket remote add` etc.
 
 ### Reprocessing a Filing
@@ -75,8 +82,9 @@ Downloader workers log each failure with accession number and artifact metadata.
    DELETE FROM filing_blobs WHERE filing_id = (SELECT id FROM filings WHERE accession_number = '<ACCESSION>');
    UPDATE filings SET status = 'pending', downloaded_at = NULL WHERE accession_number = '<ACCESSION>';
    ```
-2. Requeue the download task via Redis CLI:
+2. Requeue the download task via Redis CLI (clear the queue dedupe entry first or the task will be ignored):
    ```bash
+   redis-cli srem sec:ingestion:download:dedupe "<ACCESSION>"
    redis-cli rpush sec:ingestion:download '{"accession_number":"<ACCESSION>","cik":"<CIK>","form_type":"<FORM>","filing_href":"<URL>","filed_at":"<ISO8601>"}'
    ```
 3. Monitor the downloader metrics (`sec_downloader_latency_seconds`, `sec_downloader_errors_total`) to confirm successful processing.

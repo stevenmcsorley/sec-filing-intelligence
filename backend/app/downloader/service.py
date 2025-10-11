@@ -49,7 +49,12 @@ class DownloadService:
             encoding="utf-8",
             decode_responses=True,
         )
-        self._queue = RedisDownloadQueue(redis, self._settings.edgar_download_queue_name)
+        self._queue = RedisDownloadQueue(
+            redis,
+            self._settings.edgar_download_queue_name,
+            visibility_timeout=self._settings.downloader_visibility_timeout_seconds,
+            requeue_batch_size=self._settings.downloader_requeue_batch_size,
+        )
 
         if self._settings.parser_enabled:
             parse_redis = Redis.from_url(

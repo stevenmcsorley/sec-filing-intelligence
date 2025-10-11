@@ -7,6 +7,7 @@ import logging
 from collections.abc import Callable, Coroutine
 from datetime import UTC, datetime
 
+from .backpressure import QueueBackpressure
 from .feed import EdgarFeedClient
 from .metrics import FETCH_LATENCY_SECONDS, NEW_FILINGS_COUNTER, POLL_ERRORS_COUNTER
 from .models import DownloadTask, FilingFeedEntry
@@ -26,6 +27,7 @@ class Poller:
         fetch_fn: Callable[[], Coroutine[None, None, list[FilingFeedEntry]]],
         state_store: AccessionStateStore,
         queue_publisher: IngestionQueuePublisher,
+        backpressure: QueueBackpressure | None = None,
     ) -> None:
         self._name = name
         self._interval = interval_seconds
@@ -33,6 +35,7 @@ class Poller:
         self._state_store = state_store
         self._queue_publisher = queue_publisher
         self._stop_event = asyncio.Event()
+        self._backpressure = backpressure
 
     @property
     def name(self) -> str:
@@ -42,6 +45,8 @@ class Poller:
         """Run the polling loop until stopped."""
         LOGGER.info("Starting poller", extra={"feed": self._name, "interval": self._interval})
         while not self._stop_event.is_set():
+            if self._backpressure is not None:
+                await self._backpressure.wait_if_needed()
             await self._run_once()
             try:
                 await asyncio.wait_for(self._stop_event.wait(), timeout=self._interval)
@@ -102,11 +107,13 @@ class CompanyPollerFactory:
         state_store: AccessionStateStore,
         queue_publisher: IngestionQueuePublisher,
         interval_seconds: int,
+        backpressure: QueueBackpressure | None = None,
     ) -> None:
         self._feed_client = feed_client
         self._base_url = base_url
         self._state_store = state_store
         self._queue_publisher = queue_publisher
+        self._backpressure = backpressure
         self._interval = interval_seconds
 
     def build(self, cik: str) -> Poller:
@@ -122,4 +129,5 @@ class CompanyPollerFactory:
             fetch_fn=fetch,
             state_store=self._state_store,
             queue_publisher=self._queue_publisher,
+            backpressure=self._backpressure,
         )

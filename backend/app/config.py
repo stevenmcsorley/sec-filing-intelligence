@@ -101,6 +101,12 @@ class Settings(BaseModel):
     downloader_request_timeout: float = Field(
         default=float(os.getenv("DOWNLOADER_REQUEST_TIMEOUT", "30"))
     )
+    downloader_visibility_timeout_seconds: int = Field(
+        default=int(os.getenv("DOWNLOADER_VISIBILITY_TIMEOUT_SECONDS", "60"))
+    )
+    downloader_requeue_batch_size: int = Field(
+        default=int(os.getenv("DOWNLOADER_REQUEUE_BATCH_SIZE", "100"))
+    )
 
     minio_endpoint: str = Field(default=os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
     minio_access_key: str = Field(default=os.getenv("MINIO_ACCESS_KEY", "filings"))
@@ -127,6 +133,15 @@ class Settings(BaseModel):
     )
     parser_backoff_seconds: float = Field(
         default=float(os.getenv("PARSER_BACKOFF_SECONDS", "1.5"))
+    )
+    edgar_download_queue_pause_threshold: int = Field(
+        default=int(os.getenv("EDGAR_DOWNLOAD_QUEUE_PAUSE_THRESHOLD", "500"))
+    )
+    edgar_download_queue_resume_threshold: int = Field(
+        default=int(os.getenv("EDGAR_DOWNLOAD_QUEUE_RESUME_THRESHOLD", "350"))
+    )
+    edgar_backpressure_check_interval_seconds: float = Field(
+        default=float(os.getenv("EDGAR_BACKPRESSURE_CHECK_INTERVAL_SECONDS", "1.0"))
     )
 
     @property
