@@ -8,7 +8,10 @@ from collections.abc import Iterable
 
 from redis.asyncio import Redis
 
+from app.downloader.queue import RedisDownloadQueue
+
 from ..config import Settings
+from .backpressure import QueueBackpressure
 from .feed import EdgarFeedClient
 from .metrics import POLL_ERRORS_COUNTER
 from .poller import CompanyPollerFactory, Poller
@@ -55,14 +58,32 @@ class IngestionService:
             redis_client,
             key=self._settings.edgar_seen_accessions_key,
         )
-        queue_publisher = RedisQueuePublisher(
+        download_queue = RedisDownloadQueue(
             redis_client,
-            queue_name=self._settings.edgar_download_queue_name,
+            self._settings.edgar_download_queue_name,
+            visibility_timeout=self._settings.downloader_visibility_timeout_seconds,
+            requeue_batch_size=self._settings.downloader_requeue_batch_size,
         )
+        queue_publisher = RedisQueuePublisher(download_queue)
 
         # Open HTTP client lifespan
         await self._client_lifespan_cm.__aenter__()
         self._client_lifespan_active = True
+
+        backpressure: QueueBackpressure | None = None
+        if self._settings.edgar_download_queue_pause_threshold > 0:
+            resume_threshold = max(
+                0,
+                self._settings.edgar_download_queue_resume_threshold
+                or self._settings.edgar_download_queue_pause_threshold // 2,
+            )
+            backpressure = QueueBackpressure(
+                redis_client,
+                self._settings.edgar_download_queue_name,
+                pause_threshold=self._settings.edgar_download_queue_pause_threshold,
+                resume_threshold=resume_threshold,
+                check_interval=self._settings.edgar_backpressure_check_interval_seconds,
+            )
 
         # Global poller
         global_feed_url = str(self._settings.edgar_global_feed_url)
@@ -72,6 +93,7 @@ class IngestionService:
             fetch_fn=lambda: self._feed_client.fetch_feed(global_feed_url),
             state_store=state_store,
             queue_publisher=queue_publisher,
+            backpressure=backpressure,
         )
         self._register_poller(global_poller)
 
@@ -83,6 +105,7 @@ class IngestionService:
                 base_url=str(self._settings.edgar_company_feed_base_url),
                 state_store=state_store,
                 queue_publisher=queue_publisher,
+                backpressure=backpressure,
                 interval_seconds=self._settings.edgar_company_poll_interval_seconds,
             )
             for cik in company_ciks:

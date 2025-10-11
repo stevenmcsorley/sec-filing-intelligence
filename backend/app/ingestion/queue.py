@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
-from collections.abc import Awaitable
 from typing import Protocol
 
-from redis.asyncio import Redis
+from app.downloader.queue import DownloadQueue
 
 from .models import DownloadTask
 
@@ -19,17 +17,13 @@ class IngestionQueuePublisher(Protocol):
 
 
 class RedisQueuePublisher:
-    """Publish download tasks via Redis lists (acts as a simple queue)."""
+    """Publish download tasks using a shared download queue implementation."""
 
-    def __init__(self, redis: Redis, queue_name: str = "sec:ingestion:download") -> None:
-        self._redis = redis
-        self._queue_name = queue_name
+    def __init__(self, queue: DownloadQueue) -> None:
+        self._queue = queue
 
     async def publish_download(self, task: DownloadTask) -> None:
-        payload = json.dumps(task.to_payload())
-        result = self._redis.rpush(self._queue_name, payload)
-        if isinstance(result, Awaitable):
-            await result
+        await self._queue.push(task)
 
 
 class InMemoryQueuePublisher:
