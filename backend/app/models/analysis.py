@@ -12,6 +12,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..db import Base
 
 if TYPE_CHECKING:  # pragma: no cover - typing aid only
+    from .entity import FilingEntity
     from .filing import Filing, FilingSection
 
 
@@ -58,6 +59,9 @@ class FilingAnalysis(Base):
     filing: Mapped[Filing] = relationship("Filing", back_populates="analyses")
     section: Mapped[FilingSection | None] = relationship(
         "FilingSection", back_populates="analyses"
+    )
+    entities: Mapped[list[FilingEntity]] = relationship(
+        "FilingEntity", back_populates="analysis", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:

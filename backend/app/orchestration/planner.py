@@ -79,6 +79,19 @@ class ChunkTask:
             estimated_tokens=_to_int(payload["estimated_tokens"], field="estimated_tokens"),
         )
 
+    def with_job_id(self, job_id: str) -> ChunkTask:
+        return ChunkTask(
+            job_id=job_id,
+            accession_number=self.accession_number,
+            section_ordinal=self.section_ordinal,
+            section_title=self.section_title,
+            chunk_index=self.chunk_index,
+            start_paragraph_index=self.start_paragraph_index,
+            end_paragraph_index=self.end_paragraph_index,
+            content=self.content,
+            estimated_tokens=self.estimated_tokens,
+        )
+
 
 class ChunkPlanner:
     """Split parsed sections into hierarchical chunks for Groq processing."""

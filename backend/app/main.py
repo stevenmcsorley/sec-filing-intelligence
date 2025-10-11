@@ -8,6 +8,7 @@ from .auth.router import router as auth_router
 from .config import get_settings
 from .db import close_db, init_db
 from .downloader import DownloadService
+from .entities import EntityExtractionService
 from .ingestion import IngestionService
 from .parsing import ParserService
 from .summarization import SectionSummaryService
@@ -27,10 +28,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await parser_service.start()
     summary_service = SectionSummaryService(settings)
     await summary_service.start()
+    entity_service = EntityExtractionService(settings)
+    await entity_service.start()
     state = cast(Any, app.state)
     state.ingestion_service = ingestion_service
     state.download_service = download_service
     state.parser_service = parser_service
+    state.entity_service = entity_service
     state.summary_service = summary_service
     yield
     # Shutdown
@@ -43,6 +47,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     if current_summary_service is not None:
         await current_summary_service.stop()
+    current_entity_service = cast(
+        EntityExtractionService | None, getattr(state, "entity_service", None)
+    )
+    if current_entity_service is not None:
+        await current_entity_service.stop()
     current_download_service = cast(
         DownloadService | None,
         getattr(state, "download_service", None),

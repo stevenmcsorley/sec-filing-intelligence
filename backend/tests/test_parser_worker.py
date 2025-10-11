@@ -14,7 +14,7 @@ from app.models.filing import BlobKind, Filing, FilingBlob, FilingSection, Filin
 from app.orchestration.planner import ChunkPlanner, ChunkPlannerOptions
 from app.orchestration.queue import InMemoryChunkQueue
 from app.parsing.queue import InMemoryParseQueue
-from app.parsing.worker import ParserOptions, ParserWorker
+from app.parsing.worker import ChunkQueueTarget, ParserOptions, ParserWorker
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -73,7 +73,7 @@ async def test_parser_worker_creates_sections(tmp_path: Path) -> None:
         session_factory=session_factory,
         fetcher=storage,
         options=options,
-        chunk_queue=chunk_queue,
+        chunk_targets=[ChunkQueueTarget(queue=chunk_queue)],
         chunk_planner=chunk_planner,
     )
 

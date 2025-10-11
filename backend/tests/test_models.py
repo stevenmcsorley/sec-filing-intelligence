@@ -10,6 +10,7 @@ from app.models import (
     Filing,
     FilingAnalysis,
     FilingBlob,
+    FilingEntity,
     FilingSection,
     Organization,
     Subscription,
@@ -17,6 +18,7 @@ from app.models import (
     Watchlist,
     WatchlistItem,
 )
+from app.models.analysis import AnalysisType
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -276,3 +278,65 @@ async def test_filing_analysis_links_section(db_session: AsyncSession) -> None:
     loaded = result.scalar_one()
     assert len(loaded.analyses) == 1
     assert loaded.analyses[0].section_id == section.id
+
+
+@pytest.mark.asyncio
+async def test_filing_entity_relationships(db_session: AsyncSession) -> None:
+    """Ensure entity extraction results persist with relationships."""
+    company = Company(cik="0007777777", name="Entity Corp")
+    db_session.add(company)
+    await db_session.flush()
+
+    filing = Filing(
+        company_id=company.id,
+        cik=company.cik,
+        form_type="8-K",
+        filed_at=datetime.now(UTC),
+        accession_number="0007777777-25-000123",
+        source_urls='["https://example.com"]',
+        status="analyzed",
+    )
+    db_session.add(filing)
+    await db_session.flush()
+
+    section = FilingSection(
+        filing_id=filing.id,
+        title="Executive Changes",
+        ordinal=1,
+        content="Executive news",
+    )
+    db_session.add(section)
+    await db_session.flush()
+
+    analysis = FilingAnalysis(
+        job_id="0007777777-25-000123:1:0:entity",
+        filing_id=filing.id,
+        section_id=section.id,
+        chunk_index=None,
+        analysis_type=AnalysisType.ENTITY_EXTRACTION.value,
+        model="test-model",
+        content="[]",
+    )
+    db_session.add(analysis)
+    await db_session.flush()
+
+    entity = FilingEntity(
+        filing_id=filing.id,
+        section_id=section.id,
+        analysis_id=analysis.id,
+        entity_type="executive_change",
+        label="CFO resigned",
+        confidence=0.9,
+        source_excerpt="CFO resigned",
+        attributes='{"effective_date":"2025-03-01"}',
+    )
+    db_session.add(entity)
+    await db_session.commit()
+
+    result = await db_session.execute(
+        select(FilingEntity).where(FilingEntity.analysis_id == analysis.id)
+    )
+    stored = result.scalar_one()
+    assert stored.filing_id == filing.id
+    assert stored.analysis is not None
+    assert stored.section is not None
