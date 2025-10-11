@@ -26,6 +26,9 @@ class StorageBackend(Protocol):
     async def store(self, key: str, data: bytes, content_type: str | None) -> StoredArtifact:
         """Persist the artifact and return its location."""
 
+    async def fetch(self, location: str) -> bytes:
+        """Retrieve artifact bytes."""
+
 
 class MinioStorageBackend:
     """Storage backend that writes artifacts to MinIO."""
@@ -83,6 +86,15 @@ class MinioStorageBackend:
         location = f"s3://{self._bucket}/{key}"
         return StoredArtifact(location=location, content_type=content_type)
 
+    async def fetch(self, location: str) -> bytes:
+        bucket, key = _split_s3_location(location)
+        response = await asyncio.to_thread(self._client.get_object, bucket, key)
+        try:
+            data = await asyncio.to_thread(response.read)
+        finally:
+            response.close()
+        return data
+
 
 class LocalFilesystemStorageBackend:
     """Filesystem storage used primarily in tests."""
@@ -95,3 +107,16 @@ class LocalFilesystemStorageBackend:
         path.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(path.write_bytes, data)
         return StoredArtifact(location=f"file://{path}", content_type=content_type)
+
+    async def fetch(self, location: str) -> bytes:
+        path = Path(location.replace("file://", ""))
+        return await asyncio.to_thread(path.read_bytes)
+
+
+def _split_s3_location(location: str) -> tuple[str, str]:
+    if not location.startswith("s3://"):
+        raise ValueError(f"Unsupported location: {location}")
+    parts = location[5:].split("/", 1)
+    if len(parts) != 2:
+        raise ValueError(f"Invalid S3 location: {location}")
+    return parts[0], parts[1]

@@ -14,6 +14,7 @@ from app.downloader.worker import DownloadOptions, DownloadWorker
 from app.ingestion.models import DownloadTask
 from app.models.company import Company
 from app.models.filing import BlobKind, Filing, FilingBlob, FilingStatus
+from app.parsing.queue import InMemoryParseQueue
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -29,6 +30,7 @@ async def _setup_session_factory() -> async_sessionmaker[AsyncSession]:
 async def test_download_worker_persists_artifacts(tmp_path: Path) -> None:
     session_factory = await _setup_session_factory()
     queue = InMemoryDownloadQueue()
+    parse_queue = InMemoryParseQueue()
     options = DownloadOptions(max_retries=2, backoff_seconds=0, request_timeout=5)
 
     filing_href = "https://example.com/Archive/0001234567-25-000001-index.htm"
@@ -69,9 +71,14 @@ async def test_download_worker_persists_artifacts(tmp_path: Path) -> None:
             storage=storage,
             http_client=client,
             options=options,
+            parse_queue=parse_queue,
         )
 
         await worker._handle_task(task)  # type: ignore[attr-defined]
+
+    parse_task = await parse_queue.pop(timeout=1)
+    assert parse_task is not None
+    assert parse_task.accession_number == task.accession_number
 
     async with session_factory() as session:
         stmt = select(Filing).where(Filing.accession_number == task.accession_number)
@@ -125,6 +132,7 @@ async def test_download_worker_marks_failure(tmp_path: Path) -> None:
         return httpx.Response(500)
 
     transport = httpx.MockTransport(handler)
+    parse_queue = InMemoryParseQueue()
     async with httpx.AsyncClient(transport=transport) as client:
         storage = LocalFilesystemStorageBackend(tmp_path)
         queue = InMemoryDownloadQueue()
@@ -135,6 +143,7 @@ async def test_download_worker_marks_failure(tmp_path: Path) -> None:
             storage=storage,
             http_client=client,
             options=options,
+            parse_queue=parse_queue,
         )
 
         await worker._handle_task(task)  # type: ignore[attr-defined]
@@ -143,3 +152,4 @@ async def test_download_worker_marks_failure(tmp_path: Path) -> None:
         stmt = select(Filing).where(Filing.accession_number == task.accession_number)
         filing = (await session.execute(stmt)).scalar_one()
         assert filing.status == FilingStatus.FAILED.value
+    assert await parse_queue.pop(timeout=1) is None

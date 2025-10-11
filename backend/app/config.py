@@ -113,6 +113,22 @@ class Settings(BaseModel):
         default=os.getenv("MINIO_FILINGS_BUCKET", "filings-raw")
     )
 
+    parser_enabled: bool = Field(
+        default=os.getenv("PARSER_ENABLED", "true").lower() == "true"
+    )
+    parser_concurrency: int = Field(
+        default=int(os.getenv("PARSER_CONCURRENCY", "2"))
+    )
+    parser_queue_name: str = Field(
+        default=os.getenv("EDGAR_PARSE_QUEUE_NAME", "sec:ingestion:parse")
+    )
+    parser_max_retries: int = Field(
+        default=int(os.getenv("PARSER_MAX_RETRIES", "3"))
+    )
+    parser_backoff_seconds: float = Field(
+        default=float(os.getenv("PARSER_BACKOFF_SECONDS", "1.5"))
+    )
+
     @property
     def keycloak_issuer(self) -> str:
         base_url = str(self.keycloak_server_url).rstrip("/")

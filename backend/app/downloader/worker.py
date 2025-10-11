@@ -14,9 +14,10 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.ingestion.models import DownloadTask
+from app.ingestion.models import DownloadTask, ParseTask
 from app.models.company import Company
 from app.models.filing import BlobKind, Filing, FilingBlob, FilingStatus
+from app.parsing.queue import ParseQueue
 
 from .metrics import DOWNLOAD_BYTES_TOTAL, DOWNLOAD_ERRORS_TOTAL, DOWNLOAD_LATENCY_SECONDS
 from .queue import DownloadQueue
@@ -51,6 +52,7 @@ class DownloadWorker:
         storage: StorageBackend,
         http_client: httpx.AsyncClient,
         options: DownloadOptions,
+        parse_queue: ParseQueue,
     ) -> None:
         self._name = name
         self._queue = queue
@@ -58,6 +60,7 @@ class DownloadWorker:
         self._storage = storage
         self._http = http_client
         self._options = options
+        self._parse_queue = parse_queue
 
     async def run(self, stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
@@ -134,6 +137,7 @@ class DownloadWorker:
         elapsed = (datetime.now(UTC) - start_time).total_seconds()
         for spec in artifacts:
             DOWNLOAD_LATENCY_SECONDS.labels(spec.kind.value).observe(elapsed)
+        await self._parse_queue.push(ParseTask(accession_number=task.accession_number))
 
     async def _mark_failed(self, task: DownloadTask) -> None:
         async with self._session_factory() as session:
