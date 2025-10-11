@@ -58,3 +58,22 @@ async def test_chunk_queue_stale_ack_noop() -> None:
     await queue.ack(second)
     assert await queue.push(task) is True
     await queue.close()
+
+
+@pytest.mark.asyncio
+async def test_chunk_queue_requeue_only_once() -> None:
+    queue = InMemoryChunkQueue(visibility_timeout=0.01)
+    task = _chunk("job-3")
+    await queue.push(task)
+    message = await queue.pop(timeout=1)
+    assert message is not None
+
+    await asyncio.sleep(0.02)
+    await queue._requeue_expired()
+    await queue._requeue_expired()
+
+    second = await queue.pop(timeout=1)
+    assert second is not None
+    assert await queue.pop(timeout=0.05) is None
+    await queue.ack(second)
+    await queue.close()

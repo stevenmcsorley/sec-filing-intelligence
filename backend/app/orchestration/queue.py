@@ -141,27 +141,24 @@ class RedisChunkQueue(ChunkQueue):
         if self._visibility_timeout <= 0:
             return
 
-        now = time.time()
-        expired_tokens = await cast(
-            Coroutine[Any, Any, list[str]],
-            self._redis.zrangebyscore(
+        if self._requeue_batch_size <= 0:
+            return
+        expired = await cast(
+            Coroutine[Any, Any, list[tuple[str, float]]],
+            self._redis.zpopmin(
                 self._processing_zset,
-                "-inf",
-                now,
-                start=0,
-                num=self._requeue_batch_size,
+                self._requeue_batch_size,
             ),
         )
-        if not expired_tokens:
+        if not expired:
             return
 
-        for token in expired_tokens:
+        for token, _ in expired:
             payload = await cast(
                 Coroutine[Any, Any, str | None],
                 self._redis.hget(self._processing_payload, token),
             )
             pipe = self._redis.pipeline()
-            pipe.zrem(self._processing_zset, token)
             pipe.hdel(self._processing_payload, token)
             if payload is not None:
                 job_data = json.loads(payload)
