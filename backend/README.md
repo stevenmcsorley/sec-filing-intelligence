@@ -18,6 +18,117 @@ uvicorn app.main:app --reload
 - `mypy app` — static type checks.
 - `pytest` — unit tests (includes API smoke tests).
 
+## Database & Migrations
+
+### Schema Overview
+
+The application uses PostgreSQL with SQLAlchemy ORM and Alembic for migrations. The schema includes:
+
+- **companies**: SEC entities with CIK and ticker information
+- **filings**: SEC filing metadata (10-K, 8-K, etc.) with processing status
+- **filing_blobs**: Storage locations for raw/parsed content in MinIO
+- **filing_sections**: Parsed sections with text content and hashes
+- **organizations**: Multi-tenant organization entities
+- **user_organizations**: User membership with roles (references Keycloak users)
+- **subscriptions**: Subscription tiers and feature flags per organization
+- **watchlists**: User-defined ticker watchlists for alert monitoring
+- **watchlist_items**: Individual tickers within watchlists
+
+### Running Migrations
+
+**In Docker** (automatic on container start):
+```bash
+# Migrations run automatically via docker-entrypoint.sh
+docker compose -f ops/compose/docker-compose.yml up -d backend
+```
+
+**Local Development**:
+```bash
+# Apply all pending migrations
+alembic upgrade head
+
+# Rollback one migration
+alembic downgrade -1
+
+# Show current migration version
+alembic current
+
+# Generate new migration (after model changes)
+alembic revision --autogenerate -m "description"
+```
+
+### Seeding Test Data
+
+The seed script creates a test organization with a free-tier subscription. No mock filing data is seeded (real filings are ingested from EDGAR).
+
+**Via Docker**:
+```bash
+# Set SEED_DB=true in config/backend.env, then restart
+docker compose -f ops/compose/docker-compose.yml restart backend
+```
+
+**Via CLI**:
+```bash
+python -m scripts.seed_db
+```
+
+### Database Configuration
+
+Set in `config/backend.env`:
+```bash
+DATABASE_URL=postgresql+asyncpg://filings:filings@postgres:5432/filings
+DATABASE_ECHO=false  # Set to true for SQL query logging
+```
+
+### Using the Database in Code
+
+```python
+from typing import Annotated
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db import get_db_session
+from app.models import Company, Filing
+
+router = APIRouter()
+
+@router.get("/companies/{cik}")
+async def get_company(
+    cik: str,
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+):
+    result = await db.execute(
+        select(Company).where(Company.cik == cik)
+    )
+    company = result.scalar_one_or_none()
+
+    if not company:
+        raise HTTPException(status_code=404)
+
+    return {"cik": company.cik, "name": company.name}
+```
+
+### Testing with Database
+
+Integration tests use an in-memory SQLite database for fast execution:
+
+```python
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models import Company
+
+@pytest.mark.asyncio
+async def test_create_company(db_session: AsyncSession):
+    company = Company(cik="0001234567", name="Test Corp")
+    db_session.add(company)
+    await db_session.commit()
+
+    assert company.id is not None
+```
+
+See `backend/tests/test_models.py` for comprehensive examples.
+
 ## Authentication & Authorization
 
 ### Keycloak Integration
