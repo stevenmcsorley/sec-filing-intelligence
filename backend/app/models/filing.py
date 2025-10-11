@@ -10,11 +10,11 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db import Base
+from .diff import FilingDiff, FilingSectionDiff
 
 if TYPE_CHECKING:
     from .analysis import FilingAnalysis
     from .company import Company
-    from .diff import FilingDiff, FilingSectionDiff
     from .entity import FilingEntity
 
 
@@ -76,12 +76,13 @@ class Filing(Base):
         back_populates="current_filing",
         cascade="all, delete-orphan",
         uselist=False,
+        foreign_keys=[FilingDiff.current_filing_id],
     )
     diffs_as_previous: Mapped[list[FilingDiff]] = relationship(
         "FilingDiff",
         back_populates="previous_filing",
         cascade="all, delete-orphan",
-        foreign_keys="FilingDiff.previous_filing_id",
+        foreign_keys=[FilingDiff.previous_filing_id],
     )
 
     def __repr__(self) -> str:
@@ -135,13 +136,13 @@ class FilingSection(Base):
         "FilingSectionDiff",
         back_populates="current_section",
         cascade="all, delete-orphan",
-        foreign_keys="FilingSectionDiff.current_section_id",
+        foreign_keys=[FilingSectionDiff.current_section_id],
     )
     previous_section_diffs: Mapped[list[FilingSectionDiff]] = relationship(
         "FilingSectionDiff",
         back_populates="previous_section",
         cascade="all, delete-orphan",
-        foreign_keys="FilingSectionDiff.previous_section_id",
+        foreign_keys=[FilingSectionDiff.previous_section_id],
     )
 
     def __repr__(self) -> str:
