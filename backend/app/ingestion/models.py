@@ -61,3 +61,17 @@ class DownloadTask:
             ticker=payload.get("ticker"),
             summary=payload.get("summary"),
         )
+
+
+@dataclass(slots=True)
+class ParseTask:
+    """Payload directing parser workers to process a filing."""
+
+    accession_number: str
+
+    def to_payload(self) -> dict[str, str]:
+        return {"accession_number": self.accession_number}
+
+    @classmethod
+    def from_payload(cls, payload: dict[str, Any]) -> ParseTask:
+        return cls(accession_number=payload["accession_number"])
