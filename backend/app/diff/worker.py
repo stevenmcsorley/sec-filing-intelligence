@@ -305,23 +305,49 @@ class DiffWorker:
                     )
                 )
 
+                existing_analysis = (
+                    await session.execute(
+                        select(FilingAnalysis)
+                        .where(FilingAnalysis.job_id == task.job_id)
+                        .with_for_update()
+                    )
+                ).scalar_one_or_none()
+
                 analysis: FilingAnalysis | None = None
                 if analysis_result is not None:
-                    analysis = FilingAnalysis(
-                        job_id=task.job_id,
-                        filing_id=locked_diff.current_filing_id,
-                        section_id=current_section.id if current_section is not None else None,
-                        chunk_index=None,
-                        analysis_type=AnalysisType.SECTION_DIFF.value,
-                        model=analysis_result.model,
-                        content=analysis_result.content,
-                        prompt_tokens=analysis_result.prompt_tokens,
-                        completion_tokens=analysis_result.completion_tokens,
-                        total_tokens=analysis_result.total_tokens,
-                        extra=metadata_json,
-                    )
-                    session.add(analysis)
+                    if existing_analysis is None:
+                        analysis = FilingAnalysis(
+                            job_id=task.job_id,
+                            filing_id=locked_diff.current_filing_id,
+                            section_id=current_section.id if current_section is not None else None,
+                            chunk_index=None,
+                            analysis_type=AnalysisType.SECTION_DIFF.value,
+                            model=analysis_result.model,
+                            content=analysis_result.content,
+                            prompt_tokens=analysis_result.prompt_tokens,
+                            completion_tokens=analysis_result.completion_tokens,
+                            total_tokens=analysis_result.total_tokens,
+                            extra=metadata_json,
+                        )
+                        session.add(analysis)
+                    else:
+                        analysis = existing_analysis
+                        analysis.filing_id = locked_diff.current_filing_id
+                        analysis.section_id = (
+                            current_section.id if current_section is not None else None
+                        )
+                        analysis.chunk_index = None
+                        analysis.analysis_type = AnalysisType.SECTION_DIFF.value
+                        analysis.model = analysis_result.model
+                        analysis.content = analysis_result.content
+                        analysis.prompt_tokens = analysis_result.prompt_tokens
+                        analysis.completion_tokens = analysis_result.completion_tokens
+                        analysis.total_tokens = analysis_result.total_tokens
+                        analysis.extra = metadata_json
                     await session.flush()
+                elif existing_analysis is not None:
+                    await session.delete(existing_analysis)
+                    analysis = None
 
                 for change in normalized_changes:
                     session.add(
