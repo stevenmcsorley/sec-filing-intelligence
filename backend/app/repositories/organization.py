@@ -26,6 +26,9 @@ class OrganizationRepository:
     ) -> tuple[Organization, UserOrganization, Subscription] | None:
         """Get user's organization membership with subscription details.
 
+        If user belongs to multiple organizations, returns the first one
+        (oldest membership by creation date) to ensure deterministic behavior.
+
         Args:
             user_id: Keycloak user subject (UUID string)
 
@@ -35,6 +38,8 @@ class OrganizationRepository:
         stmt = (
             select(UserOrganization)
             .where(UserOrganization.user_id == user_id)
+            .order_by(UserOrganization.joined_at)  # Oldest membership first
+            .limit(1)  # Ensure only one result
             .options(
                 selectinload(UserOrganization.organization).selectinload(
                     Organization.subscription
