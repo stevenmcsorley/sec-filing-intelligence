@@ -90,6 +90,7 @@ services:
 
 networks:
   secnet:
+    name: secnet
     driver: bridge
 
 volumes:

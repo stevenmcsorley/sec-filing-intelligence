@@ -1,0 +1,8 @@
+# Environment files with secrets
+.env
+
+# Grafana data (if running locally)
+grafana/data/
+
+# Any temporary or local override files
+docker-compose.override.yml

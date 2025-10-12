@@ -1,0 +1,60 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'thestox-local'
+    environment: 'development'
+
+scrape_configs:
+  # Backend FastAPI application metrics
+  - job_name: 'backend'
+    static_configs:
+      - targets: ['backend:8000']
+        labels:
+          service: 'backend'
+    metrics_path: '/metrics'
+
+  # Redis metrics (requires redis_exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+
+  # PostgreSQL metrics (requires postgres_exporter)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+
+  # Keycloak metrics (if exposed)
+  - job_name: 'keycloak'
+    static_configs:
+      - targets: ['keycloak:8080']
+        labels:
+          service: 'keycloak'
+    metrics_path: '/metrics'
+
+  # OPA metrics (if exposed)
+  - job_name: 'opa'
+    static_configs:
+      - targets: ['opa:8181']
+        labels:
+          service: 'opa'
+    metrics_path: '/metrics'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Grafana self-monitoring
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+    metrics_path: '/metrics'
