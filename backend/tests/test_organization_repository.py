@@ -5,8 +5,8 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from app.repositories import OrganizationRepository
 from app.models import Organization, Subscription, UserOrganization
+from app.repositories import OrganizationRepository
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

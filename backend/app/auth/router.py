@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db import get_db_session
+from ..repositories import OrganizationRepository
 from .dependencies import get_current_token, get_openid_client
 from .models import TokenContext
 from .opa import OPAClient, OPADecision, get_opa_client
 from .openid import KeycloakOpenIDClient
-from ..db import get_db_session
-from ..repositories import OrganizationRepository
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
