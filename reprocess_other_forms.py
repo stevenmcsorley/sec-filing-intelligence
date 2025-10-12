@@ -98,13 +98,13 @@ async def reprocess_other_forms() -> None:
                     if ticker:
                         # Update in a separate transaction
                         async with AsyncSession(engine) as update_session:
-                            await update_session.execute(
-                                select(Company).where(Company.id == company.id).with_for_update()
-                            )
-                            company.ticker = ticker
-                            await update_session.commit()
-                            logger.info(f"Set ticker {ticker} for company {company.name}")
-                            ticker_updates += 1
+                            # Load the company in this session and update it
+                            company_to_update = await update_session.get(Company, company.id)
+                            if company_to_update:
+                                company_to_update.ticker = ticker
+                                await update_session.commit()
+                                logger.info(f"Set ticker {ticker} for company {company.name}")
+                                ticker_updates += 1
                 except Exception as e:
                     logger.warning(f"Failed to update ticker for {company.name}: {e}")
 

@@ -10,6 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth.dependencies import get_current_token
+from app.auth.models import TokenContext
 from app.db import get_db_session
 from app.models.diff import FilingDiff, FilingSectionDiff
 from app.repositories import FilingRepository
@@ -19,7 +21,7 @@ router = APIRouter(prefix="/filings", tags=["filings"])
 
 @router.get("/")
 async def list_filings(
-    # token: Annotated[TokenContext, Depends(get_current_token)],
+    token: Annotated[TokenContext, Depends(get_current_token)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -31,7 +33,8 @@ async def list_filings(
     filed_before: Annotated[datetime | None, Query()] = None,
 ) -> dict[str, Any]:
     """List filings with optional filters and pagination."""
-    # del token  # Token currently unused pending OPA integration.
+    # Token validated but not currently used for authorization
+    # pending OPA integration
 
     repo = FilingRepository(db)
     filings = await repo.list_filings(
@@ -95,12 +98,13 @@ async def list_filings(
 
 @router.get("/{filing_id}")
 async def get_filing(
-    # token: Annotated[TokenContext, Depends(get_current_token)],
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
     """Get detailed information about a specific filing."""
-    # del token  # Token currently unused pending OPA integration.
+    # Token validated but not currently used for authorization
+    # pending OPA integration
 
     repo = FilingRepository(db)
     filing = await repo.get_filing_by_id(filing_id)
@@ -161,12 +165,13 @@ async def get_filing(
 
 @router.get("/{filing_id}/sections")
 async def get_filing_sections(
-    # token: Annotated[TokenContext, Depends(get_current_token)],
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> list[dict[str, Any]]:
     """Get all sections for a specific filing."""
-    # del token  # Token currently unused pending OPA integration.
+    # Token validated but not currently used for authorization
+    # pending OPA integration
 
     repo = FilingRepository(db)
     filing = await repo.get_filing_by_id(filing_id)
@@ -189,13 +194,14 @@ async def get_filing_sections(
 
 @router.get("/{filing_id}/content")
 async def get_filing_content(
-    # token: Annotated[TokenContext, Depends(get_current_token)],
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     db: Annotated[AsyncSession, Depends(get_db_session)],
     kind: Annotated[str, Query(pattern="^(raw|text|sections)$")] = "text",
 ) -> dict[str, Any]:
     """Get filing content by kind (raw, text, or sections)."""
-    # del token  # Token currently unused pending OPA integration.
+    # Token validated but not currently used for authorization
+    # pending OPA integration
 
     repo = FilingRepository(db)
     filing = await repo.get_filing_by_id(filing_id)
@@ -225,11 +231,12 @@ async def get_filing_content(
 
 @router.get("/{filing_id}/diff")
 async def get_filing_diff(
-    # token: Annotated[TokenContext, Depends(get_current_token)],
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     db: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> dict[str, Any]:
-    # del token  # Token currently unused pending OPA integration.
+    # Token validated but not currently used for authorization
+    # pending OPA integration
     diff_stmt = (
         select(FilingDiff)
         .where(FilingDiff.current_filing_id == filing_id)
