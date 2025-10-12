@@ -26,7 +26,7 @@ def _parse_company_ciks() -> list[str]:
 
 def _optional_int_env(name: str) -> int | None:
     raw = os.getenv(name)
-    if raw in (None, ""):
+    if raw is None or raw == "":
         return None
     try:
         return int(raw)
