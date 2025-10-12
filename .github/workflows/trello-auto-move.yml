@@ -1,0 +1,30 @@
+name: Move Trello Card to Done on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  move-trello-card:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract Trello Card ID from PR Title
+        id: extract
+        run: |
+          echo "${{ github.event.pull_request.title }}" | grep -oE '\[TRELLO-[0-9]+\]' | sed 's/\[TRELLO-\([0-9]\+\)\]/\1/' > card_id.txt
+          CARD_ID=$(cat card_id.txt)
+          echo "card_id=$CARD_ID" >> $GITHUB_OUTPUT
+      - name: Move Trello Card to Done
+        if: steps.extract.outputs.card_id != ''
+        env:
+          TRELLO_KEY: ${{ secrets.TRELLO_KEY }}
+          TRELLO_TOKEN: ${{ secrets.TRELLO_TOKEN }}
+          DONE_LIST_ID: 68e96bf55e9eeaf07137b1cf
+        run: |
+          CARD_ID=${{ steps.extract.outputs.card_id }}
+          if [ -n "$CARD_ID" ]; then
+            curl -X PUT "https://api.trello.com/1/cards/$CARD_ID?idList=$DONE_LIST_ID&key=$TRELLO_KEY&token=$TRELLO_TOKEN"
+          else
+            echo "No Trello card ID found in PR title."
+          fi
