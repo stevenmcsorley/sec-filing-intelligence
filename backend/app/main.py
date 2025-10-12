@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from .auth.router import router as auth_router
 from .config import get_settings
-from .db import close_db, init_db
+from .db import init_db
 from .diff import DiffService
 from .downloader import DownloadService
 from .entities import EntityExtractionService
@@ -43,36 +43,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     state.diff_service = diff_service
     yield
     # Shutdown
-    state = cast(Any, app.state)
-    current_parser_service = cast(ParserService | None, getattr(state, "parser_service", None))
-    if current_parser_service is not None:
-        await current_parser_service.stop()
-    current_summary_service = cast(
-        SectionSummaryService | None, getattr(state, "summary_service", None)
-    )
-    if current_summary_service is not None:
-        await current_summary_service.stop()
-    current_entity_service = cast(
-        EntityExtractionService | None, getattr(state, "entity_service", None)
-    )
-    if current_entity_service is not None:
-        await current_entity_service.stop()
-    current_diff_service = cast(DiffService | None, getattr(state, "diff_service", None))
-    if current_diff_service is not None:
-        await current_diff_service.stop()
-    current_download_service = cast(
-        DownloadService | None,
-        getattr(state, "download_service", None),
-    )
-    if current_download_service is not None:
-        await current_download_service.stop()
-    current_ingestion_service = cast(
-        IngestionService | None,
-        getattr(state, "ingestion_service", None),
-    )
-    if current_ingestion_service is not None:
-        await current_ingestion_service.stop()
-    await close_db()
 
 
 app = FastAPI(

@@ -88,6 +88,7 @@ class Poller:
                     filing_href=entry.filing_href,
                     filed_at=entry.filed_at,
                     summary=(entry.extra or {}).get("summary") if entry.extra else None,
+                    company_name=(entry.extra or {}).get("company_name") if entry.extra else None,
                 )
             )
 

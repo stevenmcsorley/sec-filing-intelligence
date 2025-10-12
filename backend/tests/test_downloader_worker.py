@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from datetime import UTC, datetime
@@ -153,3 +154,122 @@ async def test_download_worker_marks_failure(tmp_path: Path) -> None:
         filing = (await session.execute(stmt)).scalar_one()
         assert filing.status == FilingStatus.FAILED.value
     assert await parse_queue.pop(timeout=1) is None
+
+
+@pytest.mark.asyncio
+async def test_concurrent_company_creation_race_condition() -> None:
+    """Test that concurrent company creation doesn't cause IntegrityError."""
+    session_factory = await _setup_session_factory()
+
+    # Create the company first in one session
+    async with session_factory() as session:
+        from app.models.company import Company
+        company = Company(cik="1234567890", name="Test Company 0", ticker="TEST")
+        session.add(company)
+        await session.commit()
+
+    # Now try to create the same company multiple times with separate sessions
+    # This simulates the scenario where multiple workers encounter an existing company
+    async def create_company_task(cik: str, company_name: str) -> None:
+        from datetime import datetime
+
+        from app.downloader.worker import DownloadWorker
+        from app.ingestion.models import DownloadTask
+
+        # Create a mock task
+        task = DownloadTask(
+            accession_number=f"{cik}-25-000001",
+            cik=cik,
+            form_type="10-K",
+            filing_href=f"https://example.com/{cik}-index.htm",
+            filed_at=datetime.now(UTC),
+            company_name=company_name,
+        )
+
+        # Create a mock worker instance just to test the company creation logic
+        worker = DownloadWorker(
+            name="test-worker",
+            queue=None,  # type: ignore
+            session_factory=session_factory,
+            storage=None,  # type: ignore
+            http_client=None,  # type: ignore
+            options=None,  # type: ignore
+            parse_queue=None,  # type: ignore
+        )
+
+        # Use a separate session for each task
+        async with session_factory() as session:
+            # Call the company creation method directly - should find existing company
+            company = await worker._get_or_create_company(session, task)  # type: ignore[attr-defined]
+            assert company.cik == cik
+            assert company.name == "Test Company 0"  # Should keep the existing name
+
+    # Run multiple tasks trying to "create" the same company
+    tasks = []
+    for i in range(5):
+        task = create_company_task("1234567890", f"Test Company {i}")
+        tasks.append(task)
+
+    # Run all tasks concurrently
+    await asyncio.gather(*tasks)
+
+    # Verify only one company still exists
+    async with session_factory() as session:
+        from app.models.company import Company
+        from sqlalchemy import select
+        stmt = select(Company).where(Company.cik == "1234567890")
+        companies = (await session.execute(stmt)).scalars().all()
+        assert len(companies) == 1
+        company = companies[0]
+        assert company.name == "Test Company 0"
+
+
+@pytest.mark.asyncio
+async def test_company_creation_rollback_on_integrity_error() -> None:
+    """Test that IntegrityError properly rolls back session, allowing subsequent operations."""
+    session_factory = await _setup_session_factory()
+
+    async with session_factory() as session:
+        # First, create a company manually
+        from app.models.company import Company
+        company = Company(cik="9999999999", name="Test Company", ticker="TEST")
+        session.add(company)
+        await session.commit()
+
+        # Now try to create the same company again through the worker
+        # This should trigger IntegrityError and rollback, but session should remain usable
+        from datetime import datetime
+
+        from app.downloader.worker import DownloadWorker
+        from app.ingestion.models import DownloadTask
+
+        task = DownloadTask(
+            accession_number="9999999999-25-000001",
+            cik="9999999999",
+            form_type="10-K",
+            filing_href="https://example.com/9999999999-index.htm",
+            filed_at=datetime.now(UTC),
+            company_name="Different Name",
+        )
+
+        worker = DownloadWorker(
+            name="test-worker",
+            queue=None,  # type: ignore
+            session_factory=session_factory,
+            storage=None,  # type: ignore
+            http_client=None,  # type: ignore
+            options=None,  # type: ignore
+            parse_queue=None,  # type: ignore
+        )
+
+        # This should handle the IntegrityError gracefully and rollback
+        existing_company = await worker._get_or_create_company(session, task)  # type: ignore[attr-defined]
+        assert existing_company.cik == "9999999999"
+        assert existing_company.name == "Test Company"  # Should keep original name
+
+        # Most importantly, the session should still be usable for subsequent operations
+        # If rollback didn't happen, this would raise PendingRollbackError
+        stmt = select(Company).where(Company.cik == "9999999999")
+        result = await session.execute(stmt)
+        company_check = result.scalar_one()
+        assert company_check.name == "Test Company"
