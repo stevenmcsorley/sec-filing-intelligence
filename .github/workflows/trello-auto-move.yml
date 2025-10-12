@@ -12,7 +12,7 @@ jobs:
       - name: Extract Trello Card ID from PR Title
         id: extract
         run: |
-          echo "${{ github.event.pull_request.title }}" | grep -oE '\[TRELLO-[0-9]+\]' | sed 's/\[TRELLO-\([0-9]\+\)\]/\1/' > card_id.txt
+          echo "${{ github.event.pull_request.title }}" | grep -oE '\[TRELLO-[0-9]+\]' || true | sed 's/\[TRELLO-\([0-9]\+\)\]/\1/' > card_id.txt
           CARD_ID=$(cat card_id.txt)
           echo "card_id=$CARD_ID" >> $GITHUB_OUTPUT
       - name: Move Trello Card to Done
