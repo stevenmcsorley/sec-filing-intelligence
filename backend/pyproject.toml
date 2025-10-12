@@ -9,6 +9,7 @@ dependencies = []
 line-length = 100
 target-version = "py311"
 src = ["app"]
+exclude = ["clear_data.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

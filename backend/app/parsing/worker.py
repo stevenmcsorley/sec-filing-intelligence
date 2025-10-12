@@ -17,11 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.diff.queue import DiffQueue, DiffTask
 from app.ingestion.backpressure import QueueBackpressure
 from app.ingestion.models import ParseTask
+from app.models.company import Company
 from app.models.diff import DiffStatus, FilingDiff, FilingSectionDiff
 from app.models.filing import Filing, FilingBlob, FilingSection, FilingStatus
 from app.orchestration.metrics import CHUNK_PLANNER_CHUNKS_TOTAL, CHUNK_PLANNER_LATENCY_SECONDS
 from app.orchestration.planner import ChunkPlanner, ChunkPlannerOptions, PlannerSection
 from app.orchestration.queue import ChunkQueue
+from app.sec_utils import extract_issuer_cik
+from app.services.ticker_lookup import TickerLookupService
 
 from .metrics import PARSER_ERRORS_TOTAL, PARSER_LATENCY_SECONDS, PARSER_SECTIONS_TOTAL
 from .queue import ParseQueue
@@ -101,11 +104,14 @@ class ParserWorker:
 
     async def _handle_task(self, task: ParseTask) -> None:
         start = datetime.now(UTC)
+        sections: list[Section] = []
         try:
             sections = await self._parse_task(task)
         except Exception:
             LOGGER.exception("Failed to parse filing", extra={"accession": task.accession_number})
             PARSER_ERRORS_TOTAL.labels("parse").inc()
+            # Even if parsing fails, try to process Form 4 issuer info from raw content
+            await self._try_process_form4_issuer_from_raw(task)
             await self._mark_failed(task)
             return
 
@@ -142,6 +148,11 @@ class ParserWorker:
                             content=section.content,
                         )
                     )
+                
+                # For Form 4 filings, extract issuer information and update company if needed
+                if filing.form_type == '4':
+                    await self._process_form4_issuer(session, filing, sections)
+                
                 filing.status = FilingStatus.PARSED.value
             PARSER_SECTIONS_TOTAL.inc(len(sections))
 
@@ -171,6 +182,268 @@ class ParserWorker:
             accession_number=task.accession_number,
         )
         PARSER_LATENCY_SECONDS.observe((datetime.now(UTC) - start).total_seconds())
+
+    async def _process_form4_issuer(
+        self, session: AsyncSession, filing: Filing, sections: list[Section]
+    ) -> None:
+        """Process Form 4 filing to extract issuer information and update company records."""
+        # Extract issuer CIK from raw filing content (XML)
+        issuer_cik = None
+        
+        # First try the raw blob content
+        blob_stmt = (
+            select(FilingBlob)
+            .where(FilingBlob.filing_id == filing.id, FilingBlob.kind == 'raw')
+        )
+        raw_blob = (await session.execute(blob_stmt)).scalar_one_or_none()
+        
+        if raw_blob:
+            try:
+                raw_content = await self._fetcher.fetch(raw_blob.location)
+                raw_text = raw_content.decode('utf-8', errors='ignore')
+                issuer_cik = extract_issuer_cik(raw_text)
+                if issuer_cik:
+                    LOGGER.info(
+                        "Extracted issuer CIK from raw filing content",
+                        extra={
+                            "accession": filing.accession_number,
+                            "issuer_cik": issuer_cik,
+                            "original_cik": filing.cik
+                        }
+                    )
+            except Exception as e:
+                LOGGER.warning(
+                    "Failed to fetch raw blob content",
+                    extra={"accession": filing.accession_number, "error": str(e)}
+                )
+        
+        # Fallback to parsed sections if raw blob didn't work
+        if not issuer_cik:
+            for section in sections:
+                issuer_cik = extract_issuer_cik(section.content)
+                if issuer_cik:
+                    LOGGER.info(
+                        "Extracted issuer CIK from parsed sections",
+                        extra={
+                            "accession": filing.accession_number,
+                            "issuer_cik": issuer_cik,
+                            "original_cik": filing.cik
+                        }
+                    )
+                    break
+        
+        if not issuer_cik:
+            LOGGER.warning(
+                "Could not extract issuer CIK from Form 4 filing",
+                extra={"accession": filing.accession_number}
+            )
+            return
+        
+        # If issuer CIK is different from filing CIK, we need to update the company association
+        if issuer_cik != filing.cik:
+            # Check if issuer company already exists
+            issuer_company_stmt = select(Company).where(Company.cik == issuer_cik)
+            issuer_company = (await session.execute(issuer_company_stmt)).scalar_one_or_none()
+            
+            if issuer_company is None:
+                # Create new company for the issuer
+                ticker_service = TickerLookupService()
+                company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
+                
+                issuer_company = Company(
+                    cik=issuer_cik,
+                    name=(
+                        company_info.get("company_name", f"Company {issuer_cik}")
+                        if company_info else f"Company {issuer_cik}"
+                    ),
+                    ticker=company_info.get("ticker") if company_info else None
+                )
+                session.add(issuer_company)
+                await session.flush()
+                
+                LOGGER.info(
+                    "Created new issuer company",
+                    extra={
+                        "accession": filing.accession_number,
+                        "issuer_cik": issuer_cik,
+                        "company_name": issuer_company.name,
+                        "ticker": issuer_company.ticker
+                    }
+                )
+            else:
+                # Update existing issuer company info if needed
+                ticker_service = TickerLookupService()
+                company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
+                
+                if company_info:
+                    if (company_info.get("company_name") and
+                        issuer_company.name.startswith("Company ")):
+                        issuer_company.name = company_info["company_name"]
+                    if company_info.get("ticker") and not issuer_company.ticker:
+                        issuer_company.ticker = company_info["ticker"]
+                
+                LOGGER.info(
+                    "Updated existing issuer company",
+                    extra={
+                        "accession": filing.accession_number,
+                        "issuer_cik": issuer_cik,
+                        "company_name": issuer_company.name,
+                        "ticker": issuer_company.ticker
+                    }
+                )
+            
+            # Update filing to point to the correct issuer company
+            filing.company_id = issuer_company.id
+            filing.cik = issuer_cik
+            filing.ticker = issuer_company.ticker
+            
+            LOGGER.info(
+                "Updated filing company association",
+                extra={
+                    "accession": filing.accession_number,
+                    "old_cik": filing.cik,
+                    "new_cik": issuer_cik,
+                    "company_id": issuer_company.id
+                }
+            )
+        else:
+            # Issuer CIK matches filing CIK, just ensure company info is up to date
+            ticker_service = TickerLookupService()
+            company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
+            
+            if company_info and filing.company:
+                if company_info.get("company_name") and filing.company.name.startswith("Company "):
+                    filing.company.name = company_info["company_name"]
+                if company_info.get("ticker") and not filing.company.ticker:
+                    filing.company.ticker = company_info["ticker"]
+                    filing.ticker = company_info["ticker"]
+
+    async def _try_process_form4_issuer_from_raw(self, task: ParseTask) -> None:
+        """Try to process Form 4 issuer information from raw content even if parsing failed."""
+        async with self._session_factory() as session:
+            stmt = select(Filing).where(Filing.accession_number == task.accession_number)
+            filing = (await session.execute(stmt)).scalar_one_or_none()
+            if filing is None or filing.form_type != '4':
+                return
+            
+            # Extract issuer CIK from raw filing content (XML)
+            issuer_cik = None
+            
+            # Try the raw blob content
+            blob_stmt = (
+                select(FilingBlob)
+                .where(FilingBlob.filing_id == filing.id, FilingBlob.kind == 'raw')
+            )
+            raw_blob = (await session.execute(blob_stmt)).scalar_one_or_none()
+            
+            if raw_blob:
+                try:
+                    raw_content = await self._fetcher.fetch(raw_blob.location)
+                    raw_text = raw_content.decode('utf-8', errors='ignore')
+                    issuer_cik = extract_issuer_cik(raw_text)
+                    if issuer_cik:
+                        LOGGER.info(
+                            "Extracted issuer CIK from raw content for failed parsing",
+                            extra={
+                                "accession": filing.accession_number,
+                                "issuer_cik": issuer_cik,
+                                "original_cik": filing.cik
+                            }
+                        )
+                except Exception as e:
+                    LOGGER.warning(
+                        "Failed to fetch raw blob content for failed parsing",
+                        extra={"accession": filing.accession_number, "error": str(e)}
+                    )
+            
+            if not issuer_cik:
+                LOGGER.warning(
+                    "Could not extract issuer CIK from failed Form 4 filing",
+                    extra={"accession": filing.accession_number}
+                )
+                return
+            
+            # If issuer CIK is different from filing CIK, update the company association
+            if issuer_cik != filing.cik:
+                # Check if issuer company already exists
+                issuer_company_stmt = select(Company).where(Company.cik == issuer_cik)
+                issuer_company = (await session.execute(issuer_company_stmt)).scalar_one_or_none()
+                
+                if issuer_company is None:
+                    # Create new company for the issuer
+                    ticker_service = TickerLookupService()
+                    company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
+                    
+                    issuer_company = Company(
+                        cik=issuer_cik,
+                        name=(
+                            company_info.get("company_name", f"Company {issuer_cik}")
+                            if company_info else f"Company {issuer_cik}"
+                        ),
+                        ticker=company_info.get("ticker") if company_info else None
+                    )
+                    session.add(issuer_company)
+                    await session.flush()
+                    
+                    LOGGER.info(
+                        "Created new issuer company for failed parsing",
+                        extra={
+                            "accession": filing.accession_number,
+                            "issuer_cik": issuer_cik,
+                            "company_name": issuer_company.name,
+                            "ticker": issuer_company.ticker
+                        }
+                    )
+                else:
+                    # Update existing issuer company info if needed
+                    ticker_service = TickerLookupService()
+                    company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
+                    
+                    if company_info:
+                        if (company_info.get("company_name") and
+                            issuer_company.name.startswith("Company ")):
+                            issuer_company.name = company_info["company_name"]
+                        if company_info.get("ticker") and not issuer_company.ticker:
+                            issuer_company.ticker = company_info["ticker"]
+                    
+                    LOGGER.info(
+                        "Updated existing issuer company for failed parsing",
+                        extra={
+                            "accession": filing.accession_number,
+                            "issuer_cik": issuer_cik,
+                            "company_name": issuer_company.name,
+                            "ticker": issuer_company.ticker
+                        }
+                    )
+                
+                # Update filing to point to the correct issuer company
+                filing.company_id = issuer_company.id
+                filing.cik = issuer_cik
+                filing.ticker = issuer_company.ticker
+                
+                await session.commit()
+                
+                LOGGER.info(
+                    "Updated filing company association for failed parsing",
+                    extra={
+                        "accession": filing.accession_number,
+                        "old_cik": filing.cik,
+                        "new_cik": issuer_cik,
+                        "company_id": issuer_company.id
+                    }
+                )
+            else:
+                # Issuer CIK matches filing CIK, just ensure company info is up to date
+                ticker_service = TickerLookupService()
+                company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
+                
+                if company_info and filing.company:
+                    if (company_info.get("company_name") and
+                        filing.company.name.startswith("Company ")):
+                        filing.company.name = company_info["company_name"]
+                    if company_info.get("ticker") and not filing.company.ticker:
+                        filing.company.ticker = company_info["ticker"]
+                        filing.ticker = company_info["ticker"]
 
     async def _mark_failed(self, task: ParseTask) -> None:
         async with self._session_factory() as session:
