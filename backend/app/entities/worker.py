@@ -13,6 +13,12 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.groq.budget import (
+    BudgetExceededError,
+    GroqBudgetLimiter,
+    TokenReservation,
+    record_budget_deferral,
+)
 from app.models.analysis import AnalysisType, FilingAnalysis
 from app.models.entity import FilingEntity
 from app.models.filing import Filing, FilingSection
@@ -81,12 +87,14 @@ class EntityExtractionWorker:
         session_factory: async_sessionmaker[AsyncSession],
         client: GroqChatClient,
         options: EntityExtractionOptions,
+        budget: GroqBudgetLimiter | None = None,
     ) -> None:
         self._name = name
         self._queue = queue
         self._session_factory = session_factory
         self._client = client
         self._options = options
+        self._budget = budget
 
     async def run(self, stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
@@ -133,9 +141,29 @@ class EntityExtractionWorker:
             return True
 
         messages = self._build_messages(task, section.title)
+        reservation: TokenReservation | None = None
+        try:
+            if self._budget is not None:
+                reservation = await self._budget.reserve(self._estimate_budget_tokens(task))
+        except BudgetExceededError:
+            if self._budget is not None:
+                record_budget_deferral(self._budget)
+            LOGGER.warning(
+                "Entity extraction budget exhausted; deferring job",
+                extra={
+                    "worker": self._name,
+                    "job_id": message.job_id,
+                    "accession": task.accession_number,
+                },
+            )
+            await asyncio.sleep(self._cooldown_delay())
+            return False
+
         try:
             result = await self._extract_with_retry(messages)
         except RetryableEntityError:
+            if reservation is not None:
+                await reservation.release()
             LOGGER.warning(
                 "Retryable Groq error; requeueing entity job",
                 extra={
@@ -147,6 +175,8 @@ class EntityExtractionWorker:
             ENTITY_EXTRACTION_ERRORS_TOTAL.labels("groq_retryable").inc()
             return False
         except FatalEntityError:
+            if reservation is not None:
+                await reservation.release()
             LOGGER.error(
                 "Fatal Groq error; acknowledging entity job",
                 extra={
@@ -194,6 +224,8 @@ class EntityExtractionWorker:
             ENTITY_EXTRACTION_TOKENS_TOTAL.labels("completion").inc(result.completion_tokens)
         for entity in entities:
             ENTITY_EXTRACTION_ENTITIES_TOTAL.labels(entity["type"]).inc()
+        if reservation is not None:
+            await reservation.commit(self._resolve_total_tokens(result))
         return True
 
     async def _load_section(
@@ -230,6 +262,10 @@ class EntityExtractionWorker:
             ChatMessage(role="user", content=user_prompt),
         ]
 
+    def _estimate_budget_tokens(self, task: ChunkTask) -> int:
+        prompt_estimate = max(task.estimated_tokens, len(task.content) // 4)
+        return prompt_estimate + self._options.max_output_tokens
+
     async def _extract_with_retry(self, messages: list[ChatMessage]) -> ChatCompletionResult:
         attempt = 0
         while True:
@@ -256,6 +292,19 @@ class EntityExtractionWorker:
                 await asyncio.sleep(self._options.backoff_seconds * attempt)
             except RuntimeError as exc:
                 raise FatalEntityError from exc
+
+    def _resolve_total_tokens(self, result: ChatCompletionResult) -> int:
+        total = result.total_tokens
+        if total <= 0:
+            total = result.prompt_tokens + result.completion_tokens
+        if total <= 0:
+            total = self._options.max_output_tokens
+        return total
+
+    def _cooldown_delay(self) -> float:
+        if self._budget is None:
+            return 1.0
+        return max(float(self._budget.cooldown_seconds), 1.0)
 
     def _parse_entities(self, raw: str) -> list[dict[str, Any]]:
         try:

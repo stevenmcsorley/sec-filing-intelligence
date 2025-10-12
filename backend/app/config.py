@@ -24,6 +24,16 @@ def _parse_company_ciks() -> list[str]:
     return [token.strip() for token in raw.split(",") if token.strip()]
 
 
+def _optional_int_env(name: str) -> int | None:
+    raw = os.getenv(name)
+    if raw in (None, ""):
+        return None
+    try:
+        return int(raw)
+    except ValueError as exc:  # pragma: no cover - configuration validation
+        raise ValueError(f"Invalid integer for {name}: {raw}") from exc
+
+
 class Settings(BaseModel):
     api_host: str = Field(default=os.getenv("API_HOST", "0.0.0.0"))
     api_port: int = Field(default=int(os.getenv("API_PORT", "8000")))
@@ -140,6 +150,9 @@ class Settings(BaseModel):
     groq_api_url: AnyHttpUrl = Field(
         default=os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1")
     )
+    groq_budget_cooldown_seconds: int = Field(
+        default=int(os.getenv("GROQ_BUDGET_COOLDOWN_SECONDS", "60"))
+    )
     summarizer_enabled: bool = Field(
         default=os.getenv("SUMMARIZER_ENABLED", "true").lower() == "true"
     )
@@ -163,6 +176,9 @@ class Settings(BaseModel):
     )
     summarizer_backoff_seconds: float = Field(
         default=float(os.getenv("SUMMARIZER_BACKOFF_SECONDS", "2.0"))
+    )
+    summarizer_daily_token_budget: int | None = Field(
+        default=_optional_int_env("SUMMARIZER_DAILY_TOKEN_BUDGET")
     )
 
     entity_extraction_enabled: bool = Field(
@@ -207,6 +223,9 @@ class Settings(BaseModel):
     entity_backoff_seconds: float = Field(
         default=float(os.getenv("ENTITY_BACKOFF_SECONDS", "2.0"))
     )
+    entity_daily_token_budget: int | None = Field(
+        default=_optional_int_env("ENTITY_DAILY_TOKEN_BUDGET")
+    )
 
     diff_enabled: bool = Field(default=os.getenv("DIFF_ENABLED", "true").lower() == "true")
     diff_concurrency: int = Field(default=int(os.getenv("DIFF_CONCURRENCY", "2")))
@@ -239,6 +258,9 @@ class Settings(BaseModel):
     diff_max_retries: int = Field(default=int(os.getenv("DIFF_MAX_RETRIES", "3")))
     diff_backoff_seconds: float = Field(
         default=float(os.getenv("DIFF_BACKOFF_SECONDS", "2.0"))
+    )
+    diff_daily_token_budget: int | None = Field(
+        default=_optional_int_env("DIFF_DAILY_TOKEN_BUDGET")
     )
 
     minio_endpoint: str = Field(default=os.getenv("MINIO_ENDPOINT", "http://minio:9000"))
