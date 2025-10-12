@@ -32,7 +32,7 @@ def extract_issuer_cik(content: str) -> str | None:
     if match:
         cik = match.group(1).strip()
         if cik.isdigit() and len(cik) <= 10:
-            return cik
+            return str(cik)
 
     # Try Form 144 / Schedule 13D/A header format
     # Look for CENTRAL INDEX KEY anywhere in the content
@@ -43,7 +43,7 @@ def extract_issuer_cik(content: str) -> str | None:
         # Take the second one (issuer) if there are multiple
         cik = matches[-1].strip()  # Last match is typically the issuer
         if cik.isdigit() and len(cik) <= 10:
-            return cik
+            return str(cik)
 
     return None
 
@@ -66,7 +66,7 @@ def extract_issuer_name(content: str) -> str | None:
     issuer_name_pattern = re.compile(r'<issuerName>([^<]+)</issuerName>', re.IGNORECASE)
     match = issuer_name_pattern.search(content)
     if match:
-        return match.group(1).strip()
+        return str(match.group(1).strip())
 
     # Try Form 144 / Schedule 13D/A header format
     # Look for COMPANY CONFORMED NAME anywhere in the content
@@ -76,7 +76,7 @@ def extract_issuer_name(content: str) -> str | None:
         # For Form 3, there are two names - reporting owner and issuer
         # Take the second one (issuer) if there are multiple
         name = matches[-1].strip()  # Last match is typically the issuer
-        return name
+        return str(name)
 
     return None
 

@@ -57,7 +57,7 @@ class TickerLookupService:
             # Extract ticker from the response
             tickers = data.get("tickers", [])
             if tickers and len(tickers) > 0:
-                ticker = tickers[0].upper()
+                ticker = str(tickers[0]).upper()
                 LOGGER.info(f"Found ticker for CIK {cik}: {ticker}")
                 return ticker
             
@@ -112,7 +112,7 @@ class TickerLookupService:
             
             if company_name:
                 result = {
-                    "company_name": company_name,
+                    "company_name": str(company_name) if company_name else None,
                     "ticker": ticker.upper() if ticker else None,
                     "cik": normalized_cik
                 }

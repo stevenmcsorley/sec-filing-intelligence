@@ -123,7 +123,7 @@ class IngestionService:
             self._client_lifespan_active = False
 
         if self._redis is not None:
-            await self._redis.aclose()
+            await self._redis.aclose()  # type: ignore[attr-defined]
             self._redis = None
 
         self._pollers.clear()

@@ -276,11 +276,13 @@ class ParserWorker:
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                 
                 if company_info:
-                    if (company_info.get("company_name") and
+                    company_name = company_info.get("company_name")
+                    ticker = company_info.get("ticker")
+                    if (company_name and
                         issuer_company.name.startswith("Company ")):
-                        issuer_company.name = company_info["company_name"]
-                    if company_info.get("ticker") and not issuer_company.ticker:
-                        issuer_company.ticker = company_info["ticker"]
+                        issuer_company.name = company_name
+                    if ticker and not issuer_company.ticker:
+                        issuer_company.ticker = ticker
                 
                 LOGGER.info(
                     "Updated existing issuer company",
@@ -312,11 +314,13 @@ class ParserWorker:
             company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
             
             if company_info and filing.company:
-                if company_info.get("company_name") and filing.company.name.startswith("Company "):
-                    filing.company.name = company_info["company_name"]
-                if company_info.get("ticker") and not filing.company.ticker:
-                    filing.company.ticker = company_info["ticker"]
-                    filing.ticker = company_info["ticker"]
+                company_name = company_info.get("company_name")
+                ticker = company_info.get("ticker")
+                if company_name and filing.company.name.startswith("Company "):
+                    filing.company.name = company_name
+                if ticker and not filing.company.ticker:
+                    filing.company.ticker = ticker
+                    filing.ticker = ticker
 
     async def _try_process_form4_issuer_from_raw(self, task: ParseTask) -> None:
         """Try to process Form 4 issuer information from raw content even if parsing failed."""
@@ -400,11 +404,13 @@ class ParserWorker:
                     company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                     
                     if company_info:
-                        if (company_info.get("company_name") and
+                        company_name = company_info.get("company_name")
+                        ticker = company_info.get("ticker")
+                        if (company_name and
                             issuer_company.name.startswith("Company ")):
-                            issuer_company.name = company_info["company_name"]
-                        if company_info.get("ticker") and not issuer_company.ticker:
-                            issuer_company.ticker = company_info["ticker"]
+                            issuer_company.name = company_name
+                        if ticker and not issuer_company.ticker:
+                            issuer_company.ticker = ticker
                     
                     LOGGER.info(
                         "Updated existing issuer company for failed parsing",
@@ -438,12 +444,14 @@ class ParserWorker:
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                 
                 if company_info and filing.company:
-                    if (company_info.get("company_name") and
+                    company_name = company_info.get("company_name")
+                    ticker = company_info.get("ticker")
+                    if (company_name and
                         filing.company.name.startswith("Company ")):
-                        filing.company.name = company_info["company_name"]
-                    if company_info.get("ticker") and not filing.company.ticker:
-                        filing.company.ticker = company_info["ticker"]
-                        filing.ticker = company_info["ticker"]
+                        filing.company.name = company_name
+                    if ticker and not filing.company.ticker:
+                        filing.company.ticker = ticker
+                        filing.ticker = ticker
 
     async def _mark_failed(self, task: ParseTask) -> None:
         async with self._session_factory() as session:
