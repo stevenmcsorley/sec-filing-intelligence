@@ -201,7 +201,8 @@ class DownloadWorker:
             await session.execute(insert_stmt)
         except IntegrityError:
             # If upsert failed (e.g., SQLite doesn't support it), the company already exists
-            # Don't rollback, just continue to fetch
+            # Roll back the failed transaction to allow subsequent operations
+            await session.rollback()
             pass
 
         # Now fetch (it should exist now)
