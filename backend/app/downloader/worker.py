@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import insert, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.ingestion.models import DownloadTask, ParseTask
@@ -177,16 +178,48 @@ class DownloadWorker:
     async def _get_or_create_company(
         self, session: AsyncSession, task: DownloadTask
     ) -> Company:
+        # First try to find existing company
         stmt = select(Company).where(Company.cik == task.cik)
         result = await session.execute(stmt)
         company = result.scalar_one_or_none()
         if company is not None:
-            company.ticker = task.ticker
+            # Update ticker if it changed
+            if company.ticker != task.ticker:
+                company.ticker = task.ticker
             return company
 
-        company = Company(cik=task.cik, name=f"Company {task.cik}", ticker=task.ticker)
-        session.add(company)
-        await session.flush()
+        # Try to insert, ignore if it already exists
+        try:
+            insert_stmt = insert(Company).values(
+                cik=task.cik,
+                name=task.company_name or f"Company {task.cik}",
+                ticker=task.ticker
+            )
+            # Try PostgreSQL-specific upsert first
+            if hasattr(insert_stmt, 'on_conflict_do_nothing'):
+                insert_stmt = insert_stmt.on_conflict_do_nothing(constraint='companies_cik_key')
+            await session.execute(insert_stmt)
+        except IntegrityError:
+            # If upsert failed (e.g., SQLite doesn't support it), the company already exists
+            # Don't rollback, just continue to fetch
+            pass
+
+        # Now fetch (it should exist now)
+        result = await session.execute(stmt)
+        company = result.scalar_one_or_none()
+        if company is None:
+            raise RuntimeError(f"Failed to create or find company with CIK {task.cik}")
+
+        # Update ticker if needed
+        if company.ticker != task.ticker:
+            company.ticker = task.ticker
+        
+        # Update name if it's still a placeholder and we have a real name
+        if (task.company_name and 
+            company.name.startswith("Company ") and 
+            company.name == f"Company {task.cik}"):
+            company.name = task.company_name
+
         return company
 
     async def _get_or_create_filing(

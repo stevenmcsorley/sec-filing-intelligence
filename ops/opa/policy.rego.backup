@@ -22,5 +22,5 @@ allow {
 is_super_admin {
   user_roles := input.user.roles
   user_roles != null
-  count([role | role := user_roles[_]; role == "super_admin"]) > 0
+  "super_admin" in user_roles
 }

@@ -5,7 +5,7 @@ services:
     build:
       context: ../..
       dockerfile: backend/Dockerfile
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info
     env_file:
       - ../../config/backend.env.example
       - ../../config/backend.env

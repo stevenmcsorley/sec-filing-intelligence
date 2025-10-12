@@ -30,6 +30,7 @@ class DownloadTask:
     filed_at: datetime
     ticker: str | None = None
     summary: str | None = None
+    company_name: str | None = None
 
     def to_payload(self) -> dict[str, Any]:
         """Return a JSON-serializable payload."""
@@ -41,6 +42,7 @@ class DownloadTask:
             "filed_at": self.filed_at.isoformat(),
             "ticker": self.ticker,
             "summary": self.summary,
+            "company_name": self.company_name,
         }
 
     @classmethod
@@ -60,6 +62,7 @@ class DownloadTask:
             filed_at=filed_at,
             ticker=payload.get("ticker"),
             summary=payload.get("summary"),
+            company_name=payload.get("company_name"),
         )
 
 

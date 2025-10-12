@@ -17,6 +17,29 @@ _ACCESSION_PATTERN = re.compile(r"accession-number=([0-9A-Za-z\-]+)")
 _CIK_PATTERN = re.compile(r"/data/(\d{1,10})/")
 
 
+def _extract_company_name(title: str | None) -> str | None:
+    """Extract company name from EDGAR feed entry title.
+
+    Example titles:
+    - "8-K - Alphabet Inc. (0001652044) (Filer)"
+    - "10-K - MICROSOFT CORP (0000789019) (Issuer)"
+    """
+    if not title:
+        return None
+
+    # Remove form type prefix like "8-K - " or "10-K - "
+    title = re.sub(r"^[\d-]+[A-Z]*\s*-\s*", "", title)
+
+    # Remove CIK and other suffixes
+    title = re.sub(r"\s*\(\d{5,10}\)\s*\([^)]*\)\s*$", "", title)
+
+    # Clean up extra whitespace
+    title = title.strip()
+
+    result = title if title else None
+    return result
+
+
 class EdgarFeedClient:
     """Fetch and normalize EDGAR Atom feeds."""
 
@@ -75,6 +98,7 @@ class EdgarFeedClient:
         extra = {
             "summary": _text(entry.find("atom:summary", ATOM_NS)),
             "title": _text(entry.find("atom:title", ATOM_NS)),
+            "company_name": _extract_company_name(_text(entry.find("atom:title", ATOM_NS))),
         }
 
         return FilingFeedEntry(
@@ -136,6 +160,7 @@ class EdgarFeedClient:
         extra = {
             "summary": _text(entry.find("atom:summary", ATOM_NS)),
             "title": _text(entry.find("atom:title", ATOM_NS)),
+            "company_name": _extract_company_name(_text(entry.find("atom:title", ATOM_NS))),
         }
 
         return FilingFeedEntry(
