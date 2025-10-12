@@ -174,32 +174,37 @@ class SectionSummaryWorker:
             SECTION_SUMMARY_ERRORS_TOTAL.labels("groq_fatal").inc()
             return True
 
-        await self._persist_analysis(
-            job_id=message.job_id,
-            filing_id=filing.id,
-            section_id=section.id,
-            chunk_index=task.chunk_index,
-            summary=result.content,
-            model=result.model,
-            prompt_tokens=result.prompt_tokens,
-            completion_tokens=result.completion_tokens,
-            total_tokens=result.total_tokens,
-            metadata={
-                "section_title": section.title,
-                "start_paragraph_index": task.start_paragraph_index,
-                "end_paragraph_index": task.end_paragraph_index,
-            },
-        )
+        try:
+            await self._persist_analysis(
+                job_id=message.job_id,
+                filing_id=filing.id,
+                section_id=section.id,
+                chunk_index=task.chunk_index,
+                summary=result.content,
+                model=result.model,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                total_tokens=result.total_tokens,
+                metadata={
+                    "section_title": section.title,
+                    "start_paragraph_index": task.start_paragraph_index,
+                    "end_paragraph_index": task.end_paragraph_index,
+                },
+            )
 
-        elapsed = (datetime.now(UTC) - start_time).total_seconds()
-        SECTION_SUMMARY_LATENCY_SECONDS.labels(result.model).observe(elapsed)
-        SECTION_SUMMARY_COMPLETIONS_TOTAL.labels(result.model).inc()
-        if result.prompt_tokens:
-            SECTION_SUMMARY_TOKENS_TOTAL.labels("prompt").inc(result.prompt_tokens)
-        if result.completion_tokens:
-            SECTION_SUMMARY_TOKENS_TOTAL.labels("completion").inc(result.completion_tokens)
-        if reservation is not None:
-            await reservation.commit(self._resolve_total_tokens(result))
+            elapsed = (datetime.now(UTC) - start_time).total_seconds()
+            SECTION_SUMMARY_LATENCY_SECONDS.labels(result.model).observe(elapsed)
+            SECTION_SUMMARY_COMPLETIONS_TOTAL.labels(result.model).inc()
+            if result.prompt_tokens:
+                SECTION_SUMMARY_TOKENS_TOTAL.labels("prompt").inc(result.prompt_tokens)
+            if result.completion_tokens:
+                SECTION_SUMMARY_TOKENS_TOTAL.labels("completion").inc(result.completion_tokens)
+            if reservation is not None:
+                await reservation.commit(self._resolve_total_tokens(result))
+        except Exception:
+            if reservation is not None:
+                await reservation.release()
+            raise
         return True
 
     async def _load_section(

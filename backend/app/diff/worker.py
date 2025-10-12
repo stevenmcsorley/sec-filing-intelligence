@@ -219,26 +219,31 @@ class DiffWorker:
                     }
                 ]
 
-        await self._persist_results(
-            task=task,
-            current_section=current_section,
-            previous_section=previous_section,
-            changes=changes,
-            analysis_result=analysis_result,
-            diff_snippet=diff_snippet,
-        )
+        try:
+            await self._persist_results(
+                task=task,
+                current_section=current_section,
+                previous_section=previous_section,
+                changes=changes,
+                analysis_result=analysis_result,
+                diff_snippet=diff_snippet,
+            )
 
-        elapsed = (datetime.now(UTC) - start).total_seconds()
-        model_label = analysis_result.model if analysis_result is not None else "noop"
-        DIFF_LATENCY_SECONDS.labels(model_label).observe(elapsed)
-        DIFF_COMPLETIONS_TOTAL.labels(model_label).inc()
-        if analysis_result is not None:
-            if analysis_result.prompt_tokens:
-                DIFF_TOKENS_TOTAL.labels("prompt").inc(analysis_result.prompt_tokens)
-            if analysis_result.completion_tokens:
-                DIFF_TOKENS_TOTAL.labels("completion").inc(analysis_result.completion_tokens)
-        for change in changes:
-            DIFF_CHANGES_TOTAL.labels(change.get("change_type", "unknown")).inc()
+            elapsed = (datetime.now(UTC) - start).total_seconds()
+            model_label = analysis_result.model if analysis_result is not None else "noop"
+            DIFF_LATENCY_SECONDS.labels(model_label).observe(elapsed)
+            DIFF_COMPLETIONS_TOTAL.labels(model_label).inc()
+            if analysis_result is not None:
+                if analysis_result.prompt_tokens:
+                    DIFF_TOKENS_TOTAL.labels("prompt").inc(analysis_result.prompt_tokens)
+                if analysis_result.completion_tokens:
+                    DIFF_TOKENS_TOTAL.labels("completion").inc(analysis_result.completion_tokens)
+            for change in changes:
+                DIFF_CHANGES_TOTAL.labels(change.get("change_type", "unknown")).inc()
+        except Exception:
+            if reservation is not None:
+                await reservation.release()
+            raise
         return True
 
     def _estimate_budget_tokens(self, diff_snippet: str) -> int:

@@ -198,34 +198,39 @@ class EntityExtractionWorker:
             ENTITY_EXTRACTION_ERRORS_TOTAL.labels("parse").inc()
             return True
 
-        await self._persist_entities(
-            job_id=message.job_id,
-            filing_id=filing.id,
-            section_id=section.id,
-            entities=entities,
-            model=result.model,
-            prompt_tokens=result.prompt_tokens,
-            completion_tokens=result.completion_tokens,
-            total_tokens=result.total_tokens,
-            metadata={
-                "section_title": section.title,
-                "chunk_index": task.chunk_index,
-                "start_paragraph_index": task.start_paragraph_index,
-                "end_paragraph_index": task.end_paragraph_index,
-            },
-        )
+        try:
+            await self._persist_entities(
+                job_id=message.job_id,
+                filing_id=filing.id,
+                section_id=section.id,
+                entities=entities,
+                model=result.model,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                total_tokens=result.total_tokens,
+                metadata={
+                    "section_title": section.title,
+                    "chunk_index": task.chunk_index,
+                    "start_paragraph_index": task.start_paragraph_index,
+                    "end_paragraph_index": task.end_paragraph_index,
+                },
+            )
 
-        elapsed = (datetime.now(UTC) - start).total_seconds()
-        ENTITY_EXTRACTION_LATENCY_SECONDS.labels(result.model).observe(elapsed)
-        ENTITY_EXTRACTION_COMPLETIONS_TOTAL.labels(result.model).inc()
-        if result.prompt_tokens:
-            ENTITY_EXTRACTION_TOKENS_TOTAL.labels("prompt").inc(result.prompt_tokens)
-        if result.completion_tokens:
-            ENTITY_EXTRACTION_TOKENS_TOTAL.labels("completion").inc(result.completion_tokens)
-        for entity in entities:
-            ENTITY_EXTRACTION_ENTITIES_TOTAL.labels(entity["type"]).inc()
-        if reservation is not None:
-            await reservation.commit(self._resolve_total_tokens(result))
+            elapsed = (datetime.now(UTC) - start).total_seconds()
+            ENTITY_EXTRACTION_LATENCY_SECONDS.labels(result.model).observe(elapsed)
+            ENTITY_EXTRACTION_COMPLETIONS_TOTAL.labels(result.model).inc()
+            if result.prompt_tokens:
+                ENTITY_EXTRACTION_TOKENS_TOTAL.labels("prompt").inc(result.prompt_tokens)
+            if result.completion_tokens:
+                ENTITY_EXTRACTION_TOKENS_TOTAL.labels("completion").inc(result.completion_tokens)
+            for entity in entities:
+                ENTITY_EXTRACTION_ENTITIES_TOTAL.labels(entity["type"]).inc()
+            if reservation is not None:
+                await reservation.commit(self._resolve_total_tokens(result))
+        except Exception:
+            if reservation is not None:
+                await reservation.release()
+            raise
         return True
 
     async def _load_section(
