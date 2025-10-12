@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { FilingsService } from "@/services/api/filings.service"
 import { FilingAdapter } from "@/services/adapters/filing.adapter"
 import { FilingCard } from "@/components/filings/FilingCard"
+import { CompanyCard } from "@/components/filings/CompanyCard"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,6 +22,8 @@ interface Filters {
 }
 
 export default function FilingsPage() {
+  console.log('FilingsPage component mounted')
+  
   const [filings, setFilings] = useState<FilingList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +40,7 @@ export default function FilingsPage() {
       
       // Determine search parameters - don't pass both cik and ticker
       let searchParams: any = {
-        limit: 20,
+        limit: 100, // Get more filings to group by company
         form_type: apiFilters.formType,
         status: apiFilters.status,
         filed_after: apiFilters.filedAfter,
@@ -55,7 +58,9 @@ export default function FilingsPage() {
       }
       
       const apiResponse = await FilingsService.list(searchParams)
+      console.log('API Response:', apiResponse)
       const domainData = FilingAdapter.listFromAPI(apiResponse)
+      console.log('Domain Data:', domainData)
       setFilings(domainData)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load filings')
@@ -77,6 +82,38 @@ export default function FilingsPage() {
     loadFilings({})
   }
 
+  // Group filings by company
+  const groupFilingsByCompany = (filings: FilingList['filings']) => {
+    const companyGroups: Record<string, { 
+      companyName: string
+      cik: string
+      ticker?: string
+      filings: FilingList['filings']
+    }> = {}
+
+    filings.forEach(filing => {
+      const key = filing.cik // Use CIK as the unique identifier
+      if (!companyGroups[key]) {
+        companyGroups[key] = {
+          companyName: filing.companyName || `CIK: ${filing.cik}`,
+          cik: filing.cik,
+          ticker: filing.ticker || undefined,
+          filings: []
+        }
+      }
+      companyGroups[key].filings.push(filing)
+    })
+
+    // Convert to array and sort by most recent filing
+    return Object.values(companyGroups).sort((a, b) => {
+      const aLatest = Math.max(...a.filings.map(f => f.filedAt.getTime()))
+      const bLatest = Math.max(...b.filings.map(f => f.filedAt.getTime()))
+      return bLatest - aLatest // Most recent first
+    })
+  }
+
+  const companyGroups = filings ? groupFilingsByCompany(filings.filings) : []
+
   if (loading) {
     return (
       <div className="container mx-auto py-8">
@@ -85,7 +122,7 @@ export default function FilingsPage() {
             <CardTitle>SEC Filings</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Loading filings...</p>
+            <p>Loading filings... (Component mounted)</p>
           </CardContent>
         </Card>
       </div>
@@ -113,9 +150,9 @@ export default function FilingsPage() {
   return (
     <div className="container mx-auto py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold">SEC Filings Explorer</h1>
+        <h1 className="text-3xl font-bold">SEC Filing Intelligence</h1>
         <p className="text-muted-foreground mt-2">
-          Browse recent SEC filings with AI-powered analysis
+          Monitor company activity through their SEC filings with AI-powered analysis
         </p>
       </div>
 
@@ -198,20 +235,26 @@ export default function FilingsPage() {
       {filings && (
         <>
           <div className="mb-4 text-sm text-muted-foreground">
-            Showing {filings.filings.length} of {filings.totalCount} filings
+            Showing {companyGroups.length} companies with {filings.filings.length} total filings
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filings.filings.map((filing) => (
-              <FilingCard key={filing.id} filing={filing} />
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {companyGroups.map((company) => (
+              <CompanyCard
+                key={company.cik}
+                companyName={company.companyName}
+                cik={company.cik}
+                ticker={company.ticker}
+                filings={company.filings}
+              />
             ))}
           </div>
 
-          {filings.filings.length === 0 && (
+          {companyGroups.length === 0 && (
             <Card>
               <CardContent className="py-8">
                 <p className="text-center text-muted-foreground">
-                  No filings found. Try adjusting your search filters.
+                  No companies found. Try adjusting your search filters.
                 </p>
               </CardContent>
             </Card>

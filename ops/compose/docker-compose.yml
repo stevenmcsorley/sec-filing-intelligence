@@ -24,6 +24,9 @@ services:
       dockerfile: frontend/Dockerfile
     env_file:
       - ../../config/frontend.env.example
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_SSE_BASE_URL=http://localhost:8000
     depends_on:
       - backend
     ports:

@@ -2,7 +2,7 @@
 import { APIFilingDetail, APIFilingList } from "@/types/api.types"
 
 export class FilingsService {
-  private static readonly BASE = "http://localhost:8000/filings/"
+  private static readonly BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/filings/`
 
   static async list(params?: {
     limit?: number
