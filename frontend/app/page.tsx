@@ -1,3 +1,6 @@
+import Link from "next/link"
+import { Button } from "@/components/ui/button"
+
 const HomePage = () => (
   <section className="space-y-6">
     <header>
@@ -8,6 +11,14 @@ const HomePage = () => (
       This Next.js app provides the presentation layer for ingestion, analysis, and alerting services. The MVP
       prioritizes real data pipelines, Groq-powered summaries, and strict RBAC enforced via Keycloak + OPA.
     </p>
+    <div className="flex gap-4">
+      <Button asChild>
+        <Link href="/filings">Browse Filings</Link>
+      </Button>
+      <Button variant="outline" asChild>
+        <Link href="/docs">View Documentation</Link>
+      </Button>
+    </div>
     <ul className="space-y-3 text-slate-300">
       <li>• Live filing ingestion from EDGAR with change detection.</li>
       <li>• AI signal scoring with impact, confidence, and governance categories.</li>
