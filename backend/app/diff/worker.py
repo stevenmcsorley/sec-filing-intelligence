@@ -15,6 +15,12 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
+from app.groq.budget import (
+    BudgetExceededError,
+    GroqBudgetLimiter,
+    TokenReservation,
+    record_budget_deferral,
+)
 from app.models.analysis import AnalysisType, FilingAnalysis
 from app.models.diff import DiffStatus, FilingDiff, FilingSectionDiff
 from app.models.filing import Filing, FilingSection
@@ -71,12 +77,14 @@ class DiffWorker:
         session_factory: async_sessionmaker[AsyncSession],
         client: GroqChatClient,
         options: DiffOptions,
+        budget: GroqBudgetLimiter | None = None,
     ) -> None:
         self._name = name
         self._queue = queue
         self._session_factory = session_factory
         self._client = client
         self._options = options
+        self._budget = budget
 
     async def run(self, stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
@@ -134,6 +142,7 @@ class DiffWorker:
 
         changes: list[dict[str, Any]] = []
         analysis_result: ChatCompletionResult | None = None
+        reservation: TokenReservation | None = None
 
         if diff_snippet.strip():
             messages = self._build_messages(
@@ -143,14 +152,41 @@ class DiffWorker:
                 diff_snippet=diff_snippet,
             )
             try:
+                if self._budget is not None:
+                    reservation = await self._budget.reserve(
+                        self._estimate_budget_tokens(diff_snippet)
+                    )
+            except BudgetExceededError:
+                if self._budget is not None:
+                    record_budget_deferral(self._budget)
+                LOGGER.warning(
+                    "Diff worker budget exhausted; deferring job",
+                    extra={
+                        "worker": self._name,
+                        "job_id": message.job_id,
+                        "diff_id": task.diff_id,
+                    },
+                )
+                await asyncio.sleep(self._cooldown_delay())
+                return False
+
+            try:
                 analysis_result = await self._diff_with_retry(messages)
             except RetryableDiffError:
+                if reservation is not None:
+                    await reservation.release()
                 DIFF_ERRORS_TOTAL.labels("groq_retryable").inc()
                 return False
             except FatalDiffError as exc:
+                if reservation is not None:
+                    await reservation.release()
                 DIFF_ERRORS_TOTAL.labels("groq_fatal").inc()
                 await self._mark_failed(task.diff_id, str(exc))
                 return True
+
+            if reservation is not None and analysis_result is not None:
+                await reservation.commit(self._resolve_total_tokens(analysis_result))
+                reservation = None
 
             try:
                 changes = _parse_changes(analysis_result.content)
@@ -183,27 +219,49 @@ class DiffWorker:
                     }
                 ]
 
-        await self._persist_results(
-            task=task,
-            current_section=current_section,
-            previous_section=previous_section,
-            changes=changes,
-            analysis_result=analysis_result,
-            diff_snippet=diff_snippet,
-        )
+        try:
+            await self._persist_results(
+                task=task,
+                current_section=current_section,
+                previous_section=previous_section,
+                changes=changes,
+                analysis_result=analysis_result,
+                diff_snippet=diff_snippet,
+            )
 
-        elapsed = (datetime.now(UTC) - start).total_seconds()
-        model_label = analysis_result.model if analysis_result is not None else "noop"
-        DIFF_LATENCY_SECONDS.labels(model_label).observe(elapsed)
-        DIFF_COMPLETIONS_TOTAL.labels(model_label).inc()
-        if analysis_result is not None:
-            if analysis_result.prompt_tokens:
-                DIFF_TOKENS_TOTAL.labels("prompt").inc(analysis_result.prompt_tokens)
-            if analysis_result.completion_tokens:
-                DIFF_TOKENS_TOTAL.labels("completion").inc(analysis_result.completion_tokens)
-        for change in changes:
-            DIFF_CHANGES_TOTAL.labels(change.get("change_type", "unknown")).inc()
+            elapsed = (datetime.now(UTC) - start).total_seconds()
+            model_label = analysis_result.model if analysis_result is not None else "noop"
+            DIFF_LATENCY_SECONDS.labels(model_label).observe(elapsed)
+            DIFF_COMPLETIONS_TOTAL.labels(model_label).inc()
+            if analysis_result is not None:
+                if analysis_result.prompt_tokens:
+                    DIFF_TOKENS_TOTAL.labels("prompt").inc(analysis_result.prompt_tokens)
+                if analysis_result.completion_tokens:
+                    DIFF_TOKENS_TOTAL.labels("completion").inc(analysis_result.completion_tokens)
+            for change in changes:
+                DIFF_CHANGES_TOTAL.labels(change.get("change_type", "unknown")).inc()
+        except Exception:
+            if reservation is not None:
+                await reservation.release()
+            raise
         return True
+
+    def _estimate_budget_tokens(self, diff_snippet: str) -> int:
+        prompt_estimate = max(len(diff_snippet) // 4, 128)
+        return prompt_estimate + self._options.max_output_tokens
+
+    def _resolve_total_tokens(self, result: ChatCompletionResult) -> int:
+        total = result.total_tokens
+        if total <= 0:
+            total = result.prompt_tokens + result.completion_tokens
+        if total <= 0:
+            total = self._options.max_output_tokens
+        return total
+
+    def _cooldown_delay(self) -> float:
+        if self._budget is None:
+            return 1.0
+        return max(float(self._budget.cooldown_seconds), 1.0)
 
     async def _load_metadata(
         self, task: DiffTask

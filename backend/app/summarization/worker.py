@@ -12,6 +12,12 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.groq.budget import (
+    BudgetExceededError,
+    GroqBudgetLimiter,
+    TokenReservation,
+    record_budget_deferral,
+)
 from app.models.analysis import AnalysisType, FilingAnalysis
 from app.models.filing import Filing, FilingSection
 from app.orchestration.planner import ChunkTask
@@ -66,12 +72,14 @@ class SectionSummaryWorker:
         session_factory: async_sessionmaker[AsyncSession],
         client: GroqChatClient,
         options: SectionSummaryOptions,
+        budget: GroqBudgetLimiter | None = None,
     ) -> None:
         self._name = name
         self._queue = queue
         self._session_factory = session_factory
         self._client = client
         self._options = options
+        self._budget = budget
 
     async def run(self, stop_event: asyncio.Event) -> None:
         """Continuously consume chunk tasks until stopped."""
@@ -119,10 +127,29 @@ class SectionSummaryWorker:
             return True
 
         messages = self._build_messages(task, section.title)
+        reservation: TokenReservation | None = None
+        try:
+            if self._budget is not None:
+                reservation = await self._budget.reserve(self._estimate_budget_tokens(task))
+        except BudgetExceededError:
+            if self._budget is not None:
+                record_budget_deferral(self._budget)
+            LOGGER.warning(
+                "Section summarizer budget exhausted; deferring job",
+                extra={
+                    "worker": self._name,
+                    "job_id": message.job_id,
+                    "accession": task.accession_number,
+                },
+            )
+            await asyncio.sleep(self._cooldown_delay())
+            return False
 
         try:
             result = await self._summarize_with_retry(messages)
         except RetryableLLMError:
+            if reservation is not None:
+                await reservation.release()
             LOGGER.warning(
                 "Retryable Groq error; requeueing job",
                 extra={
@@ -134,6 +161,8 @@ class SectionSummaryWorker:
             SECTION_SUMMARY_ERRORS_TOTAL.labels("groq_retryable").inc()
             return False
         except FatalLLMError:
+            if reservation is not None:
+                await reservation.release()
             LOGGER.error(
                 "Fatal Groq error; acknowledging job",
                 extra={
@@ -145,30 +174,37 @@ class SectionSummaryWorker:
             SECTION_SUMMARY_ERRORS_TOTAL.labels("groq_fatal").inc()
             return True
 
-        await self._persist_analysis(
-            job_id=message.job_id,
-            filing_id=filing.id,
-            section_id=section.id,
-            chunk_index=task.chunk_index,
-            summary=result.content,
-            model=result.model,
-            prompt_tokens=result.prompt_tokens,
-            completion_tokens=result.completion_tokens,
-            total_tokens=result.total_tokens,
-            metadata={
-                "section_title": section.title,
-                "start_paragraph_index": task.start_paragraph_index,
-                "end_paragraph_index": task.end_paragraph_index,
-            },
-        )
+        try:
+            await self._persist_analysis(
+                job_id=message.job_id,
+                filing_id=filing.id,
+                section_id=section.id,
+                chunk_index=task.chunk_index,
+                summary=result.content,
+                model=result.model,
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                total_tokens=result.total_tokens,
+                metadata={
+                    "section_title": section.title,
+                    "start_paragraph_index": task.start_paragraph_index,
+                    "end_paragraph_index": task.end_paragraph_index,
+                },
+            )
 
-        elapsed = (datetime.now(UTC) - start_time).total_seconds()
-        SECTION_SUMMARY_LATENCY_SECONDS.labels(result.model).observe(elapsed)
-        SECTION_SUMMARY_COMPLETIONS_TOTAL.labels(result.model).inc()
-        if result.prompt_tokens:
-            SECTION_SUMMARY_TOKENS_TOTAL.labels("prompt").inc(result.prompt_tokens)
-        if result.completion_tokens:
-            SECTION_SUMMARY_TOKENS_TOTAL.labels("completion").inc(result.completion_tokens)
+            elapsed = (datetime.now(UTC) - start_time).total_seconds()
+            SECTION_SUMMARY_LATENCY_SECONDS.labels(result.model).observe(elapsed)
+            SECTION_SUMMARY_COMPLETIONS_TOTAL.labels(result.model).inc()
+            if result.prompt_tokens:
+                SECTION_SUMMARY_TOKENS_TOTAL.labels("prompt").inc(result.prompt_tokens)
+            if result.completion_tokens:
+                SECTION_SUMMARY_TOKENS_TOTAL.labels("completion").inc(result.completion_tokens)
+            if reservation is not None:
+                await reservation.commit(self._resolve_total_tokens(result))
+        except Exception:
+            if reservation is not None:
+                await reservation.release()
+            raise
         return True
 
     async def _load_section(
@@ -207,6 +243,10 @@ class SectionSummaryWorker:
             ChatMessage(role="user", content=user_prompt),
         ]
 
+    def _estimate_budget_tokens(self, task: ChunkTask) -> int:
+        prompt_estimate = max(task.estimated_tokens, len(task.content) // 4)
+        return prompt_estimate + self._options.max_output_tokens
+
     async def _summarize_with_retry(self, messages: list[ChatMessage]) -> ChatCompletionResult:
         attempt = 0
         while True:
@@ -233,6 +273,19 @@ class SectionSummaryWorker:
                 await asyncio.sleep(self._options.backoff_seconds * attempt)
             except RuntimeError as exc:
                 raise FatalLLMError from exc
+
+    def _resolve_total_tokens(self, result: ChatCompletionResult) -> int:
+        total = result.total_tokens
+        if total <= 0:
+            total = result.prompt_tokens + result.completion_tokens
+        if total <= 0:
+            total = self._options.max_output_tokens
+        return total
+
+    def _cooldown_delay(self) -> float:
+        if self._budget is None:
+            return 1.0
+        return max(float(self._budget.cooldown_seconds), 1.0)
 
     async def _persist_analysis(
         self,

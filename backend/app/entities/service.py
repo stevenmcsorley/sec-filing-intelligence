@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.db import get_session_factory
+from app.groq.budget import TokenBudgetManager
 from app.orchestration.queue import RedisChunkQueue
 from app.summarization.client import GroqChatClient
 
@@ -26,6 +27,7 @@ class EntityExtractionService:
         self._queue: RedisChunkQueue | None = None
         self._client: GroqChatClient | None = None
         self._session_factory: async_sessionmaker[AsyncSession] | None = None
+        self._budget_manager: TokenBudgetManager | None = None
         self._tasks: list[asyncio.Task[None]] = []
         self._stop_event = asyncio.Event()
         self._started = False
@@ -54,6 +56,15 @@ class EntityExtractionService:
             visibility_timeout=self._settings.entity_queue_visibility_timeout_seconds,
             requeue_batch_size=self._settings.entity_queue_requeue_batch_size,
         )
+        self._budget_manager = TokenBudgetManager(
+            redis,
+            cooldown_seconds=self._settings.groq_budget_cooldown_seconds,
+        )
+        budget = self._budget_manager.limiter(
+            service="entity",
+            model=self._settings.entity_model,
+            daily_limit=self._settings.entity_daily_token_budget,
+        )
         api_key = self._settings.groq_api_key
         assert api_key is not None  # for mypy; validated above
         self._client = GroqChatClient(
@@ -78,6 +89,7 @@ class EntityExtractionService:
                 session_factory=session_factory,
                 client=self._client,
                 options=options,
+                budget=budget,
             )
             task = asyncio.create_task(worker.run(self._stop_event))
             self._tasks.append(task)
@@ -104,6 +116,7 @@ class EntityExtractionService:
             await self._client.aclose()
             self._client = None
 
+        self._budget_manager = None
         self._stop_event = asyncio.Event()
         self._started = False
         LOGGER.info("Entity extraction service stopped")

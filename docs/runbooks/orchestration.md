@@ -34,6 +34,10 @@ Environment variables (see `config/backend.env.example`; overrides can be placed
 | `ENTITY_MAX_OUTPUT_TOKENS` | Output token cap for entity responses. | `512` |
 | `SUMMARIZER_MODEL` | Groq model for section summaries. | `mixtral-8x7b-32768` |
 | `SUMMARIZER_MAX_OUTPUT_TOKENS` | Output token cap for summaries. | `256` |
+| `GROQ_BUDGET_COOLDOWN_SECONDS` | Back-off interval before retrying when budgets are exhausted. | `60` |
+| `SUMMARIZER_DAILY_TOKEN_BUDGET` | Optional daily token allotment for section summaries; unset disables enforcement. | _unset_ |
+| `ENTITY_DAILY_TOKEN_BUDGET` | Optional daily token allotment for entity extraction jobs. | _unset_ |
+| `DIFF_DAILY_TOKEN_BUDGET` | Optional daily token allotment for filing diff jobs. | _unset_ |
 
 ## Metrics
 
@@ -43,6 +47,8 @@ Environment variables (see `config/backend.env.example`; overrides can be placed
 - `sec_ingestion_backpressure_events_total{queue_name="sec:groq:chunk",event}` — Pause/resume transitions triggered by backlog.
 - `sec_entity_extraction_latency_seconds{model}` — Latency histogram for entity jobs.
 - `sec_entity_extraction_entities_total{entity_type}` — Count of extracted entities per category.
+- `sec_groq_budget_usage_tokens{service,model}` / `sec_groq_budget_remaining_tokens{service,model}` — Gauges tracking consumed versus remaining Groq token budgets.
+- `sec_groq_budget_deferred_jobs_total{service,model}` — Counter of jobs deferred because the token budget was exhausted.
 
 ## Operational Notes
 
@@ -54,6 +60,7 @@ Environment variables (see `config/backend.env.example`; overrides can be placed
   redis-cli rpush ${CHUNK_QUEUE_NAME} '{"job_id":"<JOB_ID>", ... }'
   ```
 - Tests covering chunk planner (`backend/tests/test_chunk_planner.py`) and queue semantics (`backend/tests/test_chunk_queue.py`) should be updated whenever heuristics or payload shape changes.
+- Token budgeting is enforced per service; once a daily budget is exceeded, workers defer jobs and leave them queued until the next window. Operators can raise limits via the env vars above or monitor `sec_groq_budget_remaining_tokens` to anticipate throttling.
 
 ## Section Summaries Worker
 

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
 from app.db import get_session_factory
+from app.groq.budget import TokenBudgetManager
 from app.summarization.client import GroqChatClient
 
 from .queue import DiffQueue, RedisDiffQueue
@@ -26,6 +27,7 @@ class DiffService:
         self._queue: DiffQueue | None = None
         self._client: GroqChatClient | None = None
         self._session_factory: async_sessionmaker[AsyncSession] | None = None
+        self._budget_manager: TokenBudgetManager | None = None
         self._tasks: list[asyncio.Task[None]] = []
         self._stop_event = asyncio.Event()
         self._started = False
@@ -54,6 +56,15 @@ class DiffService:
             visibility_timeout=self._settings.diff_queue_visibility_timeout_seconds,
             requeue_batch_size=self._settings.diff_queue_requeue_batch_size,
         )
+        self._budget_manager = TokenBudgetManager(
+            redis,
+            cooldown_seconds=self._settings.groq_budget_cooldown_seconds,
+        )
+        budget = self._budget_manager.limiter(
+            service="diff",
+            model=self._settings.diff_model,
+            daily_limit=self._settings.diff_daily_token_budget,
+        )
 
         api_key = self._settings.groq_api_key
         assert api_key is not None  # validated above
@@ -78,6 +89,7 @@ class DiffService:
                 session_factory=self._session_factory,
                 client=self._client,
                 options=options,
+                budget=budget,
             )
             task = asyncio.create_task(worker.run(self._stop_event))
             self._tasks.append(task)
@@ -103,6 +115,7 @@ class DiffService:
             await self._client.aclose()
             self._client = None
 
+        self._budget_manager = None
         self._stop_event = asyncio.Event()
         self._started = False
         LOGGER.info("Diff service stopped")
