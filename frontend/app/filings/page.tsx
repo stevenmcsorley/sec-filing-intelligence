@@ -34,15 +34,27 @@ export default function FilingsPage() {
     try {
       setLoading(true)
       const apiFilters = searchFilters || {}
-      const apiResponse = await FilingsService.list({
+      
+      // Determine search parameters - don't pass both cik and ticker
+      let searchParams: any = {
         limit: 20,
-        cik: apiFilters.search,
-        ticker: apiFilters.search,
         form_type: apiFilters.formType,
         status: apiFilters.status,
         filed_after: apiFilters.filedAfter,
         filed_before: apiFilters.filedBefore,
-      })
+      }
+      
+      if (apiFilters.search) {
+        // If search looks like a number, treat it as CIK, otherwise as ticker/company name
+        const isNumeric = /^\d+$/.test(apiFilters.search.trim())
+        if (isNumeric) {
+          searchParams.cik = apiFilters.search.trim()
+        } else {
+          searchParams.ticker = apiFilters.search.trim()
+        }
+      }
+      
+      const apiResponse = await FilingsService.list(searchParams)
       const domainData = FilingAdapter.listFromAPI(apiResponse)
       setFilings(domainData)
     } catch (err) {

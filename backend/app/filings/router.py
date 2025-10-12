@@ -10,6 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth.dependencies import get_current_token
+from app.auth.models import TokenContext
 from app.db import get_db_session
 from app.models.analysis import FilingAnalysis
 from app.models.diff import FilingDiff, FilingSectionDiff
@@ -20,7 +22,7 @@ router = APIRouter(prefix="/filings", tags=["filings"])
 
 @router.get("/")
 async def list_filings(
-    # token: Annotated[TokenContext, Depends(get_current_token)],
+    token: Annotated[TokenContext, Depends(get_current_token)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
@@ -104,6 +106,7 @@ async def list_filings(
 
 @router.get("/{filing_id}")
 async def get_filing(
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     # token: Annotated[TokenContext, Depends(get_current_token)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
@@ -159,6 +162,7 @@ async def get_filing(
 
 @router.get("/{filing_id}/sections")
 async def get_filing_sections(
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     # token: Annotated[TokenContext, Depends(get_current_token)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
@@ -187,6 +191,7 @@ async def get_filing_sections(
 
 @router.get("/{filing_id}/content")
 async def get_filing_content(
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     # token: Annotated[TokenContext, Depends(get_current_token)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
@@ -223,6 +228,7 @@ async def get_filing_content(
 
 @router.get("/{filing_id}/diff")
 async def get_filing_diff(
+    token: Annotated[TokenContext, Depends(get_current_token)],
     filing_id: int,
     # token: Annotated[TokenContext, Depends(get_current_token)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
