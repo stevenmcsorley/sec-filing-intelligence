@@ -34,6 +34,7 @@ import useApiFetch from "@/services/api/useApiFetch"
 import { FilingAdapter } from "@/services/adapters/filing.adapter"
 import { FilingCard } from "@/components/filings/FilingCard"
 import { priceDataService, CurrentPrice, HistoricalPrice, CompanyOverview } from "@/services/api/price.service"
+import { filingCorrelationService, FilingCorrelation } from "@/services/api/correlation.service"
 import { AnalyticsDashboard } from "@/components/charts/AnalyticsDashboard"
 
 interface StockProfile {
@@ -158,6 +159,43 @@ export default function StockProfilePage() {
     }
   }, [ticker, isAuthenticated])
 
+  const loadCorrelationData = useCallback(async () => {
+    if (!isAuthenticated || !ticker) return
+    
+    try {
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+      
+      // Load filing correlations
+      const correlations = await filingCorrelationService.getFilingCorrelations(
+        ticker,
+        token,
+        30, // 30 days lookback
+        1.0 // 1% minimum price change
+      )
+      
+      // Convert to chart format
+      const chartCorrelations = filingCorrelationService.convertToChartData(correlations)
+      setFilingCorrelations(chartCorrelations)
+      
+      // Generate filing markers from correlations
+      const markers = correlations.map(corr => ({
+        date: corr.filing_date,
+        formType: corr.form_type,
+        title: corr.title,
+        impact: corr.correlation_strength === 'strong' ? 'high' as const :
+                corr.correlation_strength === 'moderate' ? 'medium' as const : 'low' as const
+      }))
+      setFilingMarkers(markers)
+      
+    } catch (error) {
+      console.error('Error loading correlation data:', error)
+      // Fallback to empty data
+      setFilingCorrelations([])
+      setFilingMarkers([])
+    }
+  }, [ticker, isAuthenticated])
+
   const loadStockProfile = useCallback(async () => {
     try {
       setLoading(true)
@@ -245,27 +283,7 @@ export default function StockProfilePage() {
         annualCount: filingsData.filings.filter((f: any) => f.form_type === '10-K').length
       })
       
-      // Generate filing markers for charts
-      const markers = filingsData.filings.slice(0, 10).map((filing: any) => ({
-        date: filing.filed_at.split('T')[0], // Extract date part
-        formType: filing.form_type,
-        title: filing.company_name || `${filing.form_type} Filing`,
-        impact: filing.form_type === '8-K' ? 'high' as const : 
-                filing.form_type === '4' ? 'medium' as const : 'low' as const
-      }))
-      setFilingMarkers(markers)
-      
-      // Generate filing correlations (mock data for now)
-      const correlations = filingsData.filings.slice(0, 5).map((filing: any, index: number) => ({
-        date: filing.filed_at.split('T')[0],
-        formType: filing.form_type,
-        title: filing.company_name || `${filing.form_type} Filing`,
-        priceChangePercent: (Math.random() - 0.5) * 10, // Random -5% to +5%
-        volumeSpike: Math.random() > 0.5,
-        correlationStrength: filing.form_type === '8-K' ? 'strong' as const :
-                           filing.form_type === '4' ? 'moderate' as const : 'weak' as const
-      }))
-      setFilingCorrelations(correlations)
+      // Note: Filing markers and correlations are now loaded via loadCorrelationData()
       
       setPriceCorrelation(mockPriceCorrelation)
       setFilingInsights(mockInsights)
@@ -281,8 +299,9 @@ export default function StockProfilePage() {
     if (!authLoading && ticker) {
       loadStockProfile()
       loadPriceData()
+      loadCorrelationData()
     }
-  }, [authLoading, ticker, loadStockProfile, loadPriceData])
+  }, [authLoading, ticker, loadStockProfile, loadPriceData, loadCorrelationData])
 
   if (loading) {
     return (

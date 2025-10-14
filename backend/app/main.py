@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .api.correlation import router as correlation_router
 from .api.price import router as price_router
 from .auth.router import router as auth_router
 from .config import get_settings
@@ -69,6 +70,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(filings_router)
 app.include_router(price_router)
+app.include_router(correlation_router)
 
 
 @app.get("/health", tags=["health"])
