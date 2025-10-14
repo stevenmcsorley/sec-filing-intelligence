@@ -72,7 +72,7 @@ app.include_router(filings_router)
 @app.get("/health", tags=["health"])
 def health() -> dict[str, str]:
     """Basic readiness probe used by compose, k8s, and CI smoke tests."""
-    return {"status": "ok", "test": "this works"}
+    return {"status": "ok"}
 
 # Public endpoints (trying after router includes)
 @app.get("/test-public")

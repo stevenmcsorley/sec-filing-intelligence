@@ -338,40 +338,36 @@ class ParserWorker:
         if filing.ticker:
             return
         
-        # Initialize Redis client for caching
-        settings = get_settings()
-        redis_client = Redis.from_url(settings.redis_url)
-        ticker_service = TickerLookupService(redis_client=redis_client)
-        
-        # Look up ticker for the filing's CIK
-        ticker = await ticker_service.get_ticker_for_cik(filing.cik)
-        
-        if ticker:
-            # Update filing ticker
-            filing.ticker = ticker
+        try:
+            # Initialize Redis client for caching
+            settings = get_settings()
+            redis_client = Redis.from_url(settings.redis_url)
+            ticker_service = TickerLookupService(redis_client=redis_client)
             
-            # Update company ticker if it's missing
-            if filing.company and not filing.company.ticker:
-                filing.company.ticker = ticker
+            # Look up ticker for the filing's CIK
+            ticker = await ticker_service.get_ticker_for_cik(filing.cik)
+            
+            if ticker:
+                # Update filing ticker
+                filing.ticker = ticker
                 
-            LOGGER.info(
-                "Updated filing ticker from CIK lookup",
-                extra={
-                    "accession": filing.accession_number,
-                    "cik": filing.cik,
-                    "ticker": ticker,
-                    "form_type": filing.form_type
-                }
-            )
-        else:
-            LOGGER.debug(
-                "No ticker found for CIK",
-                extra={
-                    "accession": filing.accession_number,
-                    "cik": filing.cik,
-                    "form_type": filing.form_type
-                }
-            )
+                # Update company ticker if it's missing
+                if filing.company and not filing.company.ticker:
+                    filing.company.ticker = ticker
+                    
+                LOGGER.info(
+                    "Updated filing ticker from CIK lookup",
+                    extra={
+                        "accession": filing.accession_number,
+                        "cik": filing.cik,
+                        "ticker": ticker,
+                        "form_type": filing.form_type
+                    }
+                )
+        except Exception as e:
+            # Don't fail the entire parsing process if ticker lookup fails
+            LOGGER.warning(f"Ticker lookup failed for filing {filing.accession_number}: {e}")
+            pass
 
     async def _try_process_form4_issuer_from_raw(self, task: ParseTask) -> None:
         """Try to process Form 4, Form 144, Schedule 13D/A, and Form 3 issuer 
