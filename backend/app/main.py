@@ -1,4 +1,3 @@
-import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any, cast, Annotated
@@ -136,7 +135,7 @@ async def get_public_recent_filings(
         elif filing.form_type == "10-K":
             brief = "Annual report with comprehensive financial information"
         elif filing.form_type == "10-Q":
-            brief = "Quarterly report with financial results"
+            pass  # Quarterly report with financial results
         filing_list.append({
             "id": filing.id,
             "cik": filing.cik,

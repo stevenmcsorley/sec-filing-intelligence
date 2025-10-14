@@ -149,7 +149,8 @@ class ParserWorker:
                         )
                     )
                 
-                # For Form 4, Form 144, Schedule 13D/A, and Form 3 filings, extract issuer information and update company if needed
+                # For Form 4, Form 144, Schedule 13D/A, and Form 3 filings,
+                # extract issuer information and update company if needed
                 if filing.form_type in ['4', '144', 'SCHEDULE 13D/A', '3']:
                     await self._process_form4_issuer(session, filing, sections)
                 
@@ -186,7 +187,8 @@ class ParserWorker:
     async def _process_form4_issuer(
         self, session: AsyncSession, filing: Filing, sections: list[Section]
     ) -> None:
-        """Process Form 4, Form 144, and Schedule 13D/A filings to extract issuer information and update company records."""
+        """Process Form 4, Form 144, and Schedule 13D/A filings to extract issuer 
+        information and update company records."""
         # Extract issuer CIK and name from filing content
         issuer_cik = None
         issuer_name = None
@@ -330,7 +332,8 @@ class ParserWorker:
                     filing.ticker = ticker
 
     async def _try_process_form4_issuer_from_raw(self, task: ParseTask) -> None:
-        """Try to process Form 4, Form 144, Schedule 13D/A, and Form 3 issuer information from raw content even if parsing failed."""
+        """Try to process Form 4, Form 144, Schedule 13D/A, and Form 3 issuer 
+        information from raw content even if parsing failed."""
         async with self._session_factory() as session:
             stmt = select(Filing).where(Filing.accession_number == task.accession_number)
             filing = (await session.execute(stmt)).scalar_one_or_none()
@@ -372,7 +375,8 @@ class ParserWorker:
             
             if not issuer_cik:
                 LOGGER.warning(
-                    "Could not extract issuer CIK from failed Form 4/144/Schedule 13D/A/Form 3 filing",
+                    "Could not extract issuer CIK from failed Form 4/144/"
+                    "Schedule 13D/A/Form 3 filing",
                     extra={"accession": filing.accession_number}
                 )
                 return
