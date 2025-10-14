@@ -153,6 +153,10 @@ class Settings(BaseModel):
     groq_budget_cooldown_seconds: int = Field(
         default=int(os.getenv("GROQ_BUDGET_COOLDOWN_SECONDS", "60"))
     )
+    groq_budget_tokens_per_minute: int = Field(
+        default=int(os.getenv("GROQ_BUDGET_TOKENS_PER_MINUTE", "10000"))
+    )
+    
     summarizer_enabled: bool = Field(
         default=os.getenv("SUMMARIZER_ENABLED", "true").lower() == "true"
     )

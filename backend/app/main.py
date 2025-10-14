@@ -6,6 +6,7 @@ from fastapi import Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from .api.price import router as price_router
 from .auth.router import router as auth_router
 from .config import get_settings
 from .db import get_db_session, init_db
@@ -67,6 +68,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(filings_router)
+app.include_router(price_router)
 
 
 @app.get("/health", tags=["health"])

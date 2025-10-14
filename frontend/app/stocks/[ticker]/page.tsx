@@ -33,6 +33,7 @@ import { useAuth } from "@/lib/auth"
 import useApiFetch from "@/services/api/useApiFetch"
 import { FilingAdapter } from "@/services/adapters/filing.adapter"
 import { FilingCard } from "@/components/filings/FilingCard"
+import { priceDataService, CurrentPrice, HistoricalPrice, CompanyOverview } from "@/services/api/price.service"
 
 interface StockProfile {
   ticker: string
@@ -99,6 +100,46 @@ export default function StockProfilePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'insights' | 'filings'>('overview')
+  
+  // Price data state
+  const [currentPrice, setCurrentPrice] = useState<CurrentPrice | null>(null)
+  const [historicalPrices, setHistoricalPrices] = useState<HistoricalPrice[]>([])
+  const [companyOverview, setCompanyOverview] = useState<CompanyOverview | null>(null)
+  const [priceLoading, setPriceLoading] = useState(false)
+
+  const loadPriceData = useCallback(async () => {
+    if (!isAuthenticated) return
+    
+    try {
+      setPriceLoading(true)
+      const token = localStorage.getItem('access_token')
+      if (!token) return
+      
+      // Load current price, historical data, and company overview in parallel
+      const [currentPriceData, historicalData, overviewData] = await Promise.allSettled([
+        priceDataService.getCurrentPrice(ticker, token),
+        priceDataService.getHistoricalPrices(ticker, 30, token),
+        priceDataService.getCompanyOverview(ticker, token)
+      ])
+      
+      if (currentPriceData.status === 'fulfilled') {
+        setCurrentPrice(currentPriceData.value)
+      }
+      
+      if (historicalData.status === 'fulfilled') {
+        setHistoricalPrices(historicalData.value.data)
+      }
+      
+      if (overviewData.status === 'fulfilled') {
+        setCompanyOverview(overviewData.value)
+      }
+      
+    } catch (error) {
+      console.error('Error loading price data:', error)
+    } finally {
+      setPriceLoading(false)
+    }
+  }, [ticker, isAuthenticated])
 
   const loadStockProfile = useCallback(async () => {
     try {
@@ -199,8 +240,9 @@ export default function StockProfilePage() {
   useEffect(() => {
     if (!authLoading && ticker) {
       loadStockProfile()
+      loadPriceData()
     }
-  }, [authLoading, ticker, loadStockProfile])
+  }, [authLoading, ticker, loadStockProfile, loadPriceData])
 
   if (loading) {
     return (
@@ -261,16 +303,18 @@ export default function StockProfilePage() {
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                   {profile.ticker}
                 </h1>
-                <p className="text-xl text-muted-foreground font-medium">{profile.companyName}</p>
+                <p className="text-xl text-muted-foreground font-medium">
+                  {companyOverview?.name || profile.companyName}
+                </p>
                 <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                   <span className="flex items-center gap-1">
                     <Target className="h-4 w-4" />
                     CIK: {profile.cik}
                   </span>
-                  {profile.sector && (
+                  {(companyOverview?.sector || profile.sector) && (
                     <span className="flex items-center gap-1">
                       <BarChart3 className="h-4 w-4" />
-                      {profile.sector}
+                      {companyOverview?.sector || profile.sector}
                     </span>
                   )}
                   {profile.website && (
@@ -317,11 +361,19 @@ export default function StockProfilePage() {
                   <div>
                     <p className="text-sm font-medium text-green-800">Current Price</p>
                     <div className="text-3xl font-bold text-green-900">
-                      ${profile.currentPrice?.toFixed(2) || 'N/A'}
+                      {priceLoading ? (
+                        <div className="animate-pulse bg-green-200 h-8 w-24 rounded"></div>
+                      ) : (
+                        `$${currentPrice?.price?.toFixed(2) || profile.currentPrice?.toFixed(2) || 'N/A'}`
+                      )}
                     </div>
-                    {profile.priceChange && (
-                      <div className={`text-sm font-medium ${profile.priceChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {profile.priceChange >= 0 ? '+' : ''}${profile.priceChange.toFixed(2)} ({profile.priceChangePercent?.toFixed(2)}%)
+                    {(currentPrice?.change || profile.priceChange) && (
+                      <div className={`text-sm font-medium ${
+                        (currentPrice?.change || profile.priceChange || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {(currentPrice?.change || profile.priceChange || 0) >= 0 ? '+' : ''}
+                        ${(currentPrice?.change || profile.priceChange || 0).toFixed(2)} 
+                        ({(currentPrice?.change_percent || profile.priceChangePercent || 0).toFixed(2)}%)
                       </div>
                     )}
                   </div>
@@ -343,10 +395,15 @@ export default function StockProfilePage() {
                   <div>
                     <p className="text-sm font-medium text-blue-800">Market Cap</p>
                     <div className="text-2xl font-bold text-blue-900">
-                      ${profile.marketCap ? (profile.marketCap / 1000000000).toFixed(1) + 'B' : 'N/A'}
+                      {companyOverview?.market_cap ? 
+                        `$${(companyOverview.market_cap / 1000000000).toFixed(1)}B` : 
+                        profile.marketCap ? 
+                          `$${(profile.marketCap / 1000000000).toFixed(1)}B` : 
+                          'N/A'
+                      }
                     </div>
                     <div className="text-sm text-blue-600">
-                      Volume: {profile.volume?.toLocaleString() || 'N/A'}
+                      Volume: {currentPrice?.volume?.toLocaleString() || profile.volume?.toLocaleString() || 'N/A'}
                     </div>
                   </div>
                   <div className="p-3 rounded-full bg-blue-100">
