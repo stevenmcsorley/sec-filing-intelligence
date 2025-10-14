@@ -19,7 +19,7 @@ from .planner import ChunkTask, EnhancedChunkTask
 class ChunkQueueMessage:
     """Container representing a dequeued chunk task."""
 
-    task: ChunkTask
+    task: ChunkTask | EnhancedChunkTask
     payload: str
     job_id: str
     token: str
@@ -105,7 +105,7 @@ class RedisChunkQueue(ChunkQueue):
         data = json.loads(payload)
         # Try to create enhanced task first, fallback to regular task
         try:
-            task = EnhancedChunkTask.from_payload(data)
+            task: ChunkTask | EnhancedChunkTask = EnhancedChunkTask.from_payload(data)
         except (KeyError, TypeError):
             task = ChunkTask.from_payload(data)
         token = uuid.uuid4().hex

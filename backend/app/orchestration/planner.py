@@ -138,8 +138,8 @@ class ChunkPlanner:
     def _chunk_section(self, section: PlannerSection) -> list[Chunk]:
         """Split a section into chunks."""
         paragraphs = self._split_paragraphs(section.content)
-        chunks = []
-        current_chunk = []
+        chunks: list[Chunk] = []
+        current_chunk: list[str] = []
         current_tokens = 0
 
         for paragraph in paragraphs:
@@ -195,16 +195,36 @@ class ChunkPlanner:
 
 
 @dataclass(slots=True)
-class EnhancedChunkTask(ChunkTask):
+class EnhancedChunkTask:
     """Enhanced chunk task with rule-based analysis results."""
     
+    # Base ChunkTask fields
+    job_id: str
+    accession_number: str
+    section_ordinal: int
+    section_title: str
+    chunk_index: int
+    start_paragraph_index: int
+    end_paragraph_index: int
+    content: str
+    estimated_tokens: int
+    
+    # Enhanced fields
     pre_analysis: PreAnalysisResult | None = None
     should_skip_groq: bool = False
     groq_prompt_focus: str | None = None
 
     def to_payload(self) -> dict[str, str | int | bool | None]:
-        base_payload = super().to_payload()
-        base_payload.update({
+        base_payload: dict[str, str | int | bool | None] = {
+            "job_id": self.job_id,
+            "accession_number": self.accession_number,
+            "section_ordinal": self.section_ordinal,
+            "section_title": self.section_title,
+            "chunk_index": self.chunk_index,
+            "start_paragraph_index": self.start_paragraph_index,
+            "end_paragraph_index": self.end_paragraph_index,
+            "content": self.content,
+            "estimated_tokens": self.estimated_tokens,
             "should_skip_groq": self.should_skip_groq,
             "groq_prompt_focus": self.groq_prompt_focus,
             "pre_analysis_priority": (
@@ -213,8 +233,10 @@ class EnhancedChunkTask(ChunkTask):
             "pre_analysis_category": (
                 self.pre_analysis.category.value if self.pre_analysis else None
             ),
-            "pre_analysis_confidence": self.pre_analysis.confidence if self.pre_analysis else None,
-        })
+            "pre_analysis_confidence": (
+                str(self.pre_analysis.confidence) if self.pre_analysis else None
+            ),
+        }
         return base_payload
 
     @classmethod

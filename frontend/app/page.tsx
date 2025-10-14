@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -17,7 +17,7 @@ export default function HomePage() {
   const [loadingFilings, setLoadingFilings] = useState(false)
 
   // Mock data for when not authenticated
-  const mockFilings = [
+  const mockFilings = useMemo(() => [
     {
       cik: "0000320193",
       companyName: "Apple Inc.",
@@ -39,7 +39,7 @@ export default function HomePage() {
       filedAt: new Date("2024-10-05T16:45:00Z"),
       summary: "Major acquisition announcement of Anthropic AI and strategic partnership with Microsoft Azure"
     }
-  ]
+  ], [])
 
   const { fetchWithAuth } = useApiFetch()
 

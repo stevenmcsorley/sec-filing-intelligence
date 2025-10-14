@@ -100,12 +100,6 @@ export default function StockProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'insights' | 'filings'>('overview')
 
-  useEffect(() => {
-    if (!authLoading && ticker) {
-      loadStockProfile()
-    }
-  }, [authLoading, ticker, loadStockProfile])
-
   const loadStockProfile = useCallback(async () => {
     try {
       setLoading(true)
@@ -201,6 +195,12 @@ export default function StockProfilePage() {
       setLoading(false)
     }
   }, [ticker, fetchWithAuth])
+
+  useEffect(() => {
+    if (!authLoading && ticker) {
+      loadStockProfile()
+    }
+  }, [authLoading, ticker, loadStockProfile])
 
   if (loading) {
     return (

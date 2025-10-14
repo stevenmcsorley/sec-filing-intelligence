@@ -15,7 +15,7 @@ from redis.asyncio import Redis
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.config import Settings
+from app.config import get_settings
 from app.diff.queue import DiffQueue, DiffTask
 from app.ingestion.backpressure import QueueBackpressure
 from app.ingestion.models import ParseTask
@@ -260,7 +260,7 @@ class ParserWorker:
             if issuer_company is None:
                 # Create new company for the issuer
                 # Initialize Redis client for caching
-                settings = Settings()
+                settings = get_settings()
                 redis_client = Redis.from_url(settings.redis_url)
                 ticker_service = TickerLookupService(redis_client=redis_client)
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
@@ -290,7 +290,7 @@ class ParserWorker:
             else:
                 # Update existing issuer company info if needed
                 # Initialize Redis client for caching
-                settings = Settings()
+                settings = get_settings()
                 redis_client = Redis.from_url(settings.redis_url)
                 ticker_service = TickerLookupService(redis_client=redis_client)
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
@@ -339,7 +339,7 @@ class ParserWorker:
             return
         
         # Initialize Redis client for caching
-        settings = Settings()
+        settings = get_settings()
         redis_client = Redis.from_url(settings.redis_url)
         ticker_service = TickerLookupService(redis_client=redis_client)
         
@@ -432,7 +432,7 @@ class ParserWorker:
                 if issuer_company is None:
                     # Create new company for the issuer
                     # Initialize Redis client for caching
-                    settings = Settings()
+                    settings = get_settings()
                     redis_client = Redis.from_url(settings.redis_url)
                     ticker_service = TickerLookupService(redis_client=redis_client)
                     company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
@@ -462,7 +462,7 @@ class ParserWorker:
                 else:
                     # Update existing issuer company info if needed
                     # Initialize Redis client for caching
-                    settings = Settings()
+                    settings = get_settings()
                     redis_client = Redis.from_url(settings.redis_url)
                     ticker_service = TickerLookupService(redis_client=redis_client)
                     company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
@@ -505,7 +505,7 @@ class ParserWorker:
             else:
                 # Issuer CIK matches filing CIK, just ensure company info is up to date
                 # Initialize Redis client for caching
-                settings = Settings()
+                settings = get_settings()
                 redis_client = Redis.from_url(settings.redis_url)
                 ticker_service = TickerLookupService(redis_client=redis_client)
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)

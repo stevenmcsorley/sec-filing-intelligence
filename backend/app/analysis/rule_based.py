@@ -47,7 +47,7 @@ class PreAnalysisResult:
 class RuleBasedAnalyzer:
     """Performs rule-based analysis to reduce Groq usage and improve efficiency."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Define patterns for different filing types
         self._form_patterns = {
             "4": self._analyze_form4,

@@ -22,7 +22,7 @@ from app.groq.budget import (
 from app.models.analysis import AnalysisType, FilingAnalysis
 from app.models.entity import FilingEntity
 from app.models.filing import Filing, FilingSection
-from app.orchestration.planner import ChunkTask
+from app.orchestration.planner import ChunkTask, EnhancedChunkTask
 from app.orchestration.queue import ChunkQueue, ChunkQueueMessage
 from app.summarization.client import ChatCompletionResult, ChatMessage, GroqChatClient
 
@@ -252,7 +252,9 @@ class EntityExtractionWorker:
             section = (await session.execute(section_stmt)).scalar_one_or_none()
             return filing, section
 
-    def _build_messages(self, task: ChunkTask, section_title: str) -> list[ChatMessage]:
+    def _build_messages(
+        self, task: ChunkTask | EnhancedChunkTask, section_title: str
+    ) -> list[ChatMessage]:
         content = task.content.strip() or "No content provided."
         user_prompt = (
             f"Filing accession: {task.accession_number}\n"
@@ -267,7 +269,7 @@ class EntityExtractionWorker:
             ChatMessage(role="user", content=user_prompt),
         ]
 
-    def _estimate_budget_tokens(self, task: ChunkTask) -> int:
+    def _estimate_budget_tokens(self, task: ChunkTask | EnhancedChunkTask) -> int:
         prompt_estimate = max(task.estimated_tokens, len(task.content) // 4)
         return prompt_estimate + self._options.max_output_tokens
 
