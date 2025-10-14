@@ -141,6 +141,7 @@ class ChunkPlanner:
         chunks: list[Chunk] = []
         current_chunk: list[str] = []
         current_tokens = 0
+        paragraph_index = 0
 
         for paragraph in paragraphs:
             paragraph_tokens = self._estimate_tokens(paragraph)
@@ -152,18 +153,28 @@ class ChunkPlanner:
                 chunk_tokens = self._estimate_tokens(chunk_content)
                 
                 if chunk_tokens >= self.options.min_tokens_per_chunk:
+                    # Calculate start index with overlap
+                    start_index = max(0, paragraph_index - len(current_chunk))
                     chunks.append(Chunk(
-                        start_index=len(chunks) * self.options.paragraph_overlap,
-                        end_index=len(chunks) * self.options.paragraph_overlap + len(current_chunk),
+                        start_index=start_index,
+                        end_index=paragraph_index,
                         content=chunk_content,
                         estimated_tokens=chunk_tokens,
                     ))
                 
-                current_chunk = [paragraph]
-                current_tokens = paragraph_tokens
+                # Start new chunk with overlap from previous chunk
+                overlap_paragraphs = (
+                    current_chunk[-self.options.paragraph_overlap:] 
+                    if self.options.paragraph_overlap > 0 
+                    else []
+                )
+                current_chunk = overlap_paragraphs + [paragraph]
+                current_tokens = sum(self._estimate_tokens(p) for p in current_chunk)
             else:
                 current_chunk.append(paragraph)
                 current_tokens += paragraph_tokens
+            
+            paragraph_index += 1
 
         # Add the last chunk if it has content
         if current_chunk:
@@ -171,9 +182,10 @@ class ChunkPlanner:
             chunk_tokens = self._estimate_tokens(chunk_content)
             
             if chunk_tokens >= self.options.min_tokens_per_chunk:
+                start_index = max(0, paragraph_index - len(current_chunk))
                 chunks.append(Chunk(
-                    start_index=len(chunks) * self.options.paragraph_overlap,
-                    end_index=len(chunks) * self.options.paragraph_overlap + len(current_chunk),
+                    start_index=start_index,
+                    end_index=paragraph_index,
                     content=chunk_content,
                     estimated_tokens=chunk_tokens,
                 ))

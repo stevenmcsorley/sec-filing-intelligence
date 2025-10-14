@@ -28,20 +28,26 @@ class KeycloakTokenVerifier:
         return cls(settings=settings)
 
     def verify(self, token: str) -> TokenContext:
-        # For now, always use manual key lookup since PyJWKClient is having issues
+        # Use provided JWKS client if available, otherwise fetch from URL
         try:
-            response = requests.get(self._settings.keycloak_jwks_url)
-            jwks = response.json()
-            header = jwt.get_unverified_header(token)
-            kid = header.get("kid")
-            
-            for jwk_entry in jwks.get("keys", []):
-                if jwk_entry.get("kid") == kid and jwk_entry.get("use") == "sig":
-                    key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk_entry))
-                    signing_key = SimpleNamespace(key=key)
-                    break
+            if self._jwks_client is not None:
+                # Use the provided JWKS client (e.g., StaticJWKClient for tests)
+                signing_key = self._jwks_client.get_signing_key_from_jwt(token)
             else:
-                raise PyJWKClientError(f"No matching JWK for kid '{kid}'")
+                # Fetch from URL (production behavior)
+                response = requests.get(self._settings.keycloak_jwks_url)
+                jwks = response.json()
+                
+                header = jwt.get_unverified_header(token)
+                kid = header.get("kid")
+                
+                for jwk_entry in jwks.get("keys", []):
+                    if jwk_entry.get("kid") == kid and jwk_entry.get("use") == "sig":
+                        key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk_entry))
+                        signing_key = SimpleNamespace(key=key)
+                        break
+                else:
+                    raise PyJWKClientError(f"No matching JWK for kid '{kid}'")
         except Exception as exc:
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
@@ -55,7 +61,7 @@ class KeycloakTokenVerifier:
                 algorithms=self._settings.keycloak_algorithms,
                 audience=self._settings.keycloak_audience,
                 issuer=self._settings.keycloak_issuer,
-                options={"verify_aud": False, "verify_iss": False},  # Disable strict validation
+                options={"verify_aud": True, "verify_iss": True},  # Enable strict validation
             )
         except jwt.PyJWTError as exc:
             raise HTTPException(

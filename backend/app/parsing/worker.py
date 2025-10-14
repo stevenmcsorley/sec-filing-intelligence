@@ -366,7 +366,7 @@ class ParserWorker:
                 )
         except Exception as e:
             # Don't fail the entire parsing process if ticker lookup fails
-            LOGGER.warning(f"Ticker lookup failed for filing {filing.accession_number}: {e}")
+            LOGGER.debug(f"Ticker lookup skipped for filing {filing.accession_number}: {e}")
             pass
 
     async def _try_process_form4_issuer_from_raw(self, task: ParseTask) -> None:

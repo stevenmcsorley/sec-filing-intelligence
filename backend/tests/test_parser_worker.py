@@ -67,7 +67,7 @@ async def test_parser_worker_creates_sections(tmp_path: Path) -> None:
     options = ParserOptions(max_retries=1, backoff_seconds=0)
     chunk_queue = InMemoryChunkQueue()
     chunk_planner = ChunkPlanner(
-        ChunkPlannerOptions(max_tokens_per_chunk=400, min_tokens_per_chunk=150)
+        ChunkPlannerOptions(max_tokens_per_chunk=400, min_tokens_per_chunk=10)
     )
     worker = ParserWorker(
         name="parser-test",
@@ -201,7 +201,7 @@ async def test_parser_worker_schedules_diff_jobs(tmp_path: Path) -> None:
     chunk_queue = InMemoryChunkQueue()
     diff_queue = InMemoryDiffQueue()
     chunk_planner = ChunkPlanner(
-        ChunkPlannerOptions(max_tokens_per_chunk=400, min_tokens_per_chunk=150)
+        ChunkPlannerOptions(max_tokens_per_chunk=400, min_tokens_per_chunk=10)
     )
     worker = ParserWorker(
         name="parser-diff",
