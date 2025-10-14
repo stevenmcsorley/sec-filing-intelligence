@@ -34,6 +34,7 @@ import useApiFetch from "@/services/api/useApiFetch"
 import { FilingAdapter } from "@/services/adapters/filing.adapter"
 import { FilingCard } from "@/components/filings/FilingCard"
 import { priceDataService, CurrentPrice, HistoricalPrice, CompanyOverview } from "@/services/api/price.service"
+import { AnalyticsDashboard } from "@/components/charts/AnalyticsDashboard"
 
 interface StockProfile {
   ticker: string
@@ -106,6 +107,22 @@ export default function StockProfilePage() {
   const [historicalPrices, setHistoricalPrices] = useState<HistoricalPrice[]>([])
   const [companyOverview, setCompanyOverview] = useState<CompanyOverview | null>(null)
   const [priceLoading, setPriceLoading] = useState(false)
+  
+  // Chart data state
+  const [filingMarkers, setFilingMarkers] = useState<Array<{
+    date: string
+    formType: string
+    title: string
+    impact: 'high' | 'medium' | 'low'
+  }>>([])
+  const [filingCorrelations, setFilingCorrelations] = useState<Array<{
+    date: string
+    formType: string
+    title: string
+    priceChangePercent: number
+    volumeSpike: boolean
+    correlationStrength: 'strong' | 'moderate' | 'weak'
+  }>>([])
 
   const loadPriceData = useCallback(async () => {
     if (!isAuthenticated) return
@@ -227,6 +244,29 @@ export default function StockProfilePage() {
         quarterlyCount: filingsData.filings.filter((f: any) => f.form_type === '10-Q').length,
         annualCount: filingsData.filings.filter((f: any) => f.form_type === '10-K').length
       })
+      
+      // Generate filing markers for charts
+      const markers = filingsData.filings.slice(0, 10).map((filing: any) => ({
+        date: filing.filed_at.split('T')[0], // Extract date part
+        formType: filing.form_type,
+        title: filing.company_name || `${filing.form_type} Filing`,
+        impact: filing.form_type === '8-K' ? 'high' as const : 
+                filing.form_type === '4' ? 'medium' as const : 'low' as const
+      }))
+      setFilingMarkers(markers)
+      
+      // Generate filing correlations (mock data for now)
+      const correlations = filingsData.filings.slice(0, 5).map((filing: any, index: number) => ({
+        date: filing.filed_at.split('T')[0],
+        formType: filing.form_type,
+        title: filing.company_name || `${filing.form_type} Filing`,
+        priceChangePercent: (Math.random() - 0.5) * 10, // Random -5% to +5%
+        volumeSpike: Math.random() > 0.5,
+        correlationStrength: filing.form_type === '8-K' ? 'strong' as const :
+                           filing.form_type === '4' ? 'moderate' as const : 'weak' as const
+      }))
+      setFilingCorrelations(correlations)
+      
       setPriceCorrelation(mockPriceCorrelation)
       setFilingInsights(mockInsights)
       
@@ -529,79 +569,14 @@ export default function StockProfilePage() {
         )}
 
         {activeTab === 'analytics' && (
-          <div className="space-y-6">
-            {/* Price Correlation Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Price Correlation with Filings
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg flex items-center justify-center border-2 border-dashed border-blue-200">
-                  <div className="text-center">
-                    <BarChart3 className="h-12 w-12 text-blue-400 mx-auto mb-4" />
-                    <p className="text-blue-600 font-medium">Price Correlation Chart</p>
-                    <p className="text-sm text-blue-500">Interactive chart showing stock price movements correlated with filing events</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Filing Impact Analysis */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" />
-                    Filing Impact Analysis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">High Impact Filings</span>
-                      <Badge variant="destructive">{filingHistory?.highImpactCount || 0}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Medium Impact Filings</span>
-                      <Badge variant="default">{filingHistory?.filings.filter((f: any) => f.form_type === '10-K' || f.form_type === '10-Q').length || 0}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Low Impact Filings</span>
-                      <Badge variant="secondary">{filingHistory?.filings.filter((f: any) => f.form_type === '144' || f.form_type === '3').length || 0}</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Filing Frequency
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Quarterly Reports</span>
-                      <Badge variant="outline">{filingHistory?.quarterlyCount || 0}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Annual Reports</span>
-                      <Badge variant="outline">{filingHistory?.annualCount || 0}</Badge>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Material Events</span>
-                      <Badge variant="outline">{filingHistory?.filings.filter((f: any) => f.form_type === '8-K').length || 0}</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          <AnalyticsDashboard
+            ticker={ticker}
+            historicalPrices={historicalPrices}
+            filingMarkers={filingMarkers}
+            filingCorrelations={filingCorrelations}
+            loading={priceLoading}
+            onRefresh={loadPriceData}
+          />
         )}
 
         {activeTab === 'insights' && (
