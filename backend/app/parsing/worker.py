@@ -11,9 +11,11 @@ from io import BytesIO
 from typing import Protocol
 
 import pdfminer.high_level
+from redis.asyncio import Redis
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.config import Settings
 from app.diff.queue import DiffQueue, DiffTask
 from app.ingestion.backpressure import QueueBackpressure
 from app.ingestion.models import ParseTask
@@ -154,6 +156,9 @@ class ParserWorker:
                 if filing.form_type in ['4', '144', 'SCHEDULE 13D/A', '3']:
                     await self._process_form4_issuer(session, filing, sections)
                 
+                # For ALL filings, ensure ticker is looked up and updated
+                await self._ensure_ticker_lookup(session, filing)
+                
                 filing.status = FilingStatus.PARSED.value
             PARSER_SECTIONS_TOTAL.inc(len(sections))
 
@@ -254,7 +259,10 @@ class ParserWorker:
             
             if issuer_company is None:
                 # Create new company for the issuer
-                ticker_service = TickerLookupService()
+                # Initialize Redis client for caching
+                settings = Settings()
+                redis_client = Redis.from_url(settings.redis_url)
+                ticker_service = TickerLookupService(redis_client=redis_client)
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                 
                 issuer_company = Company(
@@ -281,7 +289,10 @@ class ParserWorker:
                 )
             else:
                 # Update existing issuer company info if needed
-                ticker_service = TickerLookupService()
+                # Initialize Redis client for caching
+                settings = Settings()
+                redis_client = Redis.from_url(settings.redis_url)
+                ticker_service = TickerLookupService(redis_client=redis_client)
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                 
                 if company_info:
@@ -319,17 +330,48 @@ class ParserWorker:
             )
         else:
             # Issuer CIK matches filing CIK, just ensure company info is up to date
-            ticker_service = TickerLookupService()
-            company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
+            pass
+
+    async def _ensure_ticker_lookup(self, session: AsyncSession, filing: Filing) -> None:
+        """Ensure ticker is looked up and updated for all filings."""
+        # Skip if ticker is already set
+        if filing.ticker:
+            return
+        
+        # Initialize Redis client for caching
+        settings = Settings()
+        redis_client = Redis.from_url(settings.redis_url)
+        ticker_service = TickerLookupService(redis_client=redis_client)
+        
+        # Look up ticker for the filing's CIK
+        ticker = await ticker_service.get_ticker_for_cik(filing.cik)
+        
+        if ticker:
+            # Update filing ticker
+            filing.ticker = ticker
             
-            if company_info and filing.company:
-                company_name = company_info.get("company_name")
-                ticker = company_info.get("ticker")
-                if company_name and filing.company.name.startswith("Company "):
-                    filing.company.name = company_name
-                if ticker and not filing.company.ticker:
-                    filing.company.ticker = ticker
-                    filing.ticker = ticker
+            # Update company ticker if it's missing
+            if filing.company and not filing.company.ticker:
+                filing.company.ticker = ticker
+                
+            LOGGER.info(
+                "Updated filing ticker from CIK lookup",
+                extra={
+                    "accession": filing.accession_number,
+                    "cik": filing.cik,
+                    "ticker": ticker,
+                    "form_type": filing.form_type
+                }
+            )
+        else:
+            LOGGER.debug(
+                "No ticker found for CIK",
+                extra={
+                    "accession": filing.accession_number,
+                    "cik": filing.cik,
+                    "form_type": filing.form_type
+                }
+            )
 
     async def _try_process_form4_issuer_from_raw(self, task: ParseTask) -> None:
         """Try to process Form 4, Form 144, Schedule 13D/A, and Form 3 issuer 
@@ -389,7 +431,10 @@ class ParserWorker:
                 
                 if issuer_company is None:
                     # Create new company for the issuer
-                    ticker_service = TickerLookupService()
+                    # Initialize Redis client for caching
+                    settings = Settings()
+                    redis_client = Redis.from_url(settings.redis_url)
+                    ticker_service = TickerLookupService(redis_client=redis_client)
                     company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                     
                     issuer_company = Company(
@@ -416,7 +461,10 @@ class ParserWorker:
                     )
                 else:
                     # Update existing issuer company info if needed
-                    ticker_service = TickerLookupService()
+                    # Initialize Redis client for caching
+                    settings = Settings()
+                    redis_client = Redis.from_url(settings.redis_url)
+                    ticker_service = TickerLookupService(redis_client=redis_client)
                     company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                     
                     if company_info:
@@ -456,7 +504,10 @@ class ParserWorker:
                 )
             else:
                 # Issuer CIK matches filing CIK, just ensure company info is up to date
-                ticker_service = TickerLookupService()
+                # Initialize Redis client for caching
+                settings = Settings()
+                redis_client = Redis.from_url(settings.redis_url)
+                ticker_service = TickerLookupService(redis_client=redis_client)
                 company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
                 
                 if company_info and filing.company:

@@ -20,7 +20,7 @@ from app.groq.budget import (
 )
 from app.models.analysis import AnalysisType, FilingAnalysis
 from app.models.filing import Filing, FilingSection
-from app.orchestration.planner import ChunkTask
+from app.orchestration.planner import ChunkTask, EnhancedChunkTask
 from app.orchestration.queue import ChunkQueue, ChunkQueueMessage
 
 from .client import ChatCompletionResult, ChatMessage, GroqChatClient
@@ -111,6 +111,25 @@ class SectionSummaryWorker:
 
     async def _handle_message(self, message: ChunkQueueMessage) -> bool:
         task = message.task
+        
+        # Check if this is an enhanced task that should skip Groq
+        if isinstance(task, EnhancedChunkTask) and task.should_skip_groq:
+            LOGGER.info(
+                "Skipping Groq analysis for low-priority filing",
+                extra={
+                    "worker": self._name,
+                    "accession": task.accession_number,
+                    "section": task.section_ordinal,
+                    "priority": (
+                        task.pre_analysis.priority.value 
+                        if task.pre_analysis else "unknown"
+                    ),
+                },
+            )
+            # Create a simple analysis result without Groq
+            await self._create_rule_based_analysis(task)
+            return True
+        
         start_time = datetime.now(UTC)
 
         filing, section = await self._load_section(task.accession_number, task.section_ordinal)
@@ -206,6 +225,51 @@ class SectionSummaryWorker:
                 await reservation.release()
             raise
         return True
+
+    async def _create_rule_based_analysis(self, task: EnhancedChunkTask) -> None:
+        """Create analysis result using rule-based pre-analysis without Groq."""
+        async with self._session_factory() as session:
+            filing_stmt = select(Filing).where(Filing.accession_number == task.accession_number)
+            filing_result = await session.execute(filing_stmt)
+            filing = filing_result.scalar_one_or_none()
+            
+            if not filing:
+                LOGGER.warning(f"Filing not found for accession: {task.accession_number}")
+                return
+            
+            # Create analysis based on pre-analysis results
+            if task.pre_analysis:
+                analysis_content = {
+                    "summary": task.pre_analysis.key_findings,
+                    "priority": task.pre_analysis.priority.value,
+                    "category": task.pre_analysis.category.value,
+                    "confidence": task.pre_analysis.confidence,
+                    "rule_based": True
+                }
+                
+                analysis = FilingAnalysis(
+                    filing_id=filing.id,
+                    section_id=None,  # Global analysis
+                    analysis_type=AnalysisType.SECTION_SUMMARY,
+                    content=json.dumps(analysis_content),
+                    model="rule-based",
+                    tokens_used=0,
+                    confidence_score=task.pre_analysis.confidence,
+                    created_at=datetime.now(UTC)
+                )
+                
+                session.add(analysis)
+                await session.commit()
+                
+                LOGGER.info(
+                    "Created rule-based analysis",
+                    extra={
+                        "worker": self._name,
+                        "accession": task.accession_number,
+                        "priority": task.pre_analysis.priority.value,
+                        "findings": len(task.pre_analysis.key_findings)
+                    }
+                )
 
     async def _load_section(
         self, accession_number: str, section_ordinal: int

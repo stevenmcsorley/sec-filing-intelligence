@@ -12,7 +12,7 @@ from typing import Any, Protocol, cast
 
 from redis.asyncio import Redis
 
-from .planner import ChunkTask
+from .planner import ChunkTask, EnhancedChunkTask
 
 
 @dataclass(slots=True)
@@ -103,7 +103,11 @@ class RedisChunkQueue(ChunkQueue):
             return None
 
         data = json.loads(payload)
-        task = ChunkTask.from_payload(data)
+        # Try to create enhanced task first, fallback to regular task
+        try:
+            task = EnhancedChunkTask.from_payload(data)
+        except (KeyError, TypeError):
+            task = ChunkTask.from_payload(data)
         token = uuid.uuid4().hex
         expiry = time.time() + self._visibility_timeout
 

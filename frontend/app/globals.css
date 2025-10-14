@@ -5,6 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* Light theme - keeping minimal for fallback */
   --color-background: hsl(0 0% 100%);
   --color-foreground: hsl(222.2 84% 4.9%);
   --color-card: hsl(0 0% 100%);
@@ -27,57 +28,65 @@
   --radius: 0.5rem;
 }
 
+/* Professional Dark Financial Theme */
 .dark {
-  --color-background: hsl(222.2 84% 4.9%);
-  --color-foreground: hsl(210 40% 98%);
-  --color-card: hsl(222.2 84% 4.9%);
-  --color-card-foreground: hsl(210 40% 98%);
-  --color-popover: hsl(222.2 84% 4.9%);
-  --color-popover-foreground: hsl(210 40% 98%);
-  --color-primary: hsl(217.2 91.2% 59.8%);
-  --color-primary-foreground: hsl(222.2 84% 4.9%);
-  --color-secondary: hsl(217.2 32.6% 17.5%);
-  --color-secondary-foreground: hsl(210 40% 98%);
-  --color-muted: hsl(217.2 32.6% 17.5%);
-  --color-muted-foreground: hsl(215 20.2% 65.1%);
-  --color-accent: hsl(217.2 32.6% 17.5%);
-  --color-accent-foreground: hsl(210 40% 98%);
-  --color-destructive: hsl(0 62.8% 30.6%);
-  --color-destructive-foreground: hsl(210 40% 98%);
-  --color-border: hsl(217.2 32.6% 17.5%);
-  --color-input: hsl(217.2 32.6% 17.5%);
-  --color-ring: hsl(224.3 76.3% 94.1%);
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Core background and text colors - deep charcoal with high contrast */
+  --color-background: hsl(220, 13%, 8%);        /* Very dark blue-gray */
+  --color-foreground: hsl(220, 13%, 95%);      /* Near white for high contrast */
+  --color-card: hsl(220, 13%, 12%);            /* Slightly lighter than background */
+  --color-card-foreground: hsl(220, 13%, 95%); /* High contrast text */
+  --color-popover: hsl(220, 13%, 12%);         /* Same as card */
+  --color-popover-foreground: hsl(220, 13%, 95%);
+  
+  /* Primary colors - professional blue accent */
+  --color-primary: hsl(217, 91%, 60%);         /* Bright blue for CTAs */
+  --color-primary-foreground: hsl(220, 13%, 8%); /* Dark text on bright blue */
+  
+  /* Secondary colors - subtle gray */
+  --color-secondary: hsl(220, 13%, 18%);      /* Dark gray */
+  --color-secondary-foreground: hsl(220, 13%, 95%); /* Light text */
+  
+  /* Muted colors - for subtle elements */
+  --color-muted: hsl(220, 13%, 15%);           /* Dark muted background */
+  --color-muted-foreground: hsl(220, 13%, 65%); /* Medium gray text */
+  
+  /* Accent colors - subtle highlight */
+  --color-accent: hsl(220, 13%, 18%);          /* Same as secondary */
+  --color-accent-foreground: hsl(220, 13%, 95%);
+  
+  /* Destructive colors - professional red */
+  --color-destructive: hsl(0, 84%, 60%);       /* Clear red for errors */
+  --color-destructive-foreground: hsl(0, 0%, 100%); /* White text */
+  
+  /* Border and input colors */
+  --color-border: hsl(220, 13%, 25%);           /* Subtle borders */
+  --color-input: hsl(220, 13%, 20%);           /* Input backgrounds */
+  --color-ring: hsl(217, 91%, 60%);            /* Focus ring matches primary */
+  
+  /* Financial theme specific colors */
+  --success: hsl(142, 76%, 36%);               /* Professional green */
+  --success-foreground: hsl(0, 0%, 100%);      /* White text */
+  --warning: hsl(38, 92%, 50%);                /* Professional amber */
+  --warning-foreground: hsl(220, 13%, 8%);     /* Dark text */
+  --info: hsl(217, 91%, 60%);                  /* Same as primary */
+  --info-foreground: hsl(220, 13%, 8%);        /* Dark text */
+  
+  /* Chart colors for data visualization */
+  --chart-1: hsl(217, 91%, 60%);               /* Primary blue */
+  --chart-2: hsl(142, 76%, 36%);               /* Success green */
+  --chart-3: hsl(38, 92%, 50%);                /* Warning amber */
+  --chart-4: hsl(0, 84%, 60%);                 /* Destructive red */
+  --chart-5: hsl(280, 100%, 70%);              /* Purple accent */
+  
+  /* Sidebar specific colors */
+  --sidebar: hsl(220, 13%, 10%);               /* Slightly lighter than background */
+  --sidebar-foreground: hsl(220, 13%, 95%);    /* Light text */
+  --sidebar-primary: hsl(217, 91%, 60%);       /* Primary blue */
+  --sidebar-primary-foreground: hsl(220, 13%, 8%); /* Dark text */
+  --sidebar-accent: hsl(220, 13%, 18%);        /* Secondary gray */
+  --sidebar-accent-foreground: hsl(220, 13%, 95%); /* Light text */
+  --sidebar-border: hsl(220, 13%, 25%);         /* Subtle border */
+  --sidebar-ring: hsl(217, 91%, 60%);          /* Focus ring */
 }
 
 @layer base {
@@ -130,37 +139,52 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  
+  /* Default to dark theme as primary */
+  --background: hsl(220, 13%, 8%);
+  --foreground: hsl(220, 13%, 95%);
+  --card: hsl(220, 13%, 12%);
+  --card-foreground: hsl(220, 13%, 95%);
+  --popover: hsl(220, 13%, 12%);
+  --popover-foreground: hsl(220, 13%, 95%);
+  --primary: hsl(217, 91%, 60%);
+  --primary-foreground: hsl(220, 13%, 8%);
+  --secondary: hsl(220, 13%, 18%);
+  --secondary-foreground: hsl(220, 13%, 95%);
+  --muted: hsl(220, 13%, 15%);
+  --muted-foreground: hsl(220, 13%, 65%);
+  --accent: hsl(220, 13%, 18%);
+  --accent-foreground: hsl(220, 13%, 95%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(0, 0%, 100%);
+  --border: hsl(220, 13%, 25%);
+  --input: hsl(220, 13%, 20%);
+  --ring: hsl(217, 91%, 60%);
+  
+  /* Financial theme colors */
+  --success: hsl(142, 76%, 36%);
+  --success-foreground: hsl(0, 0%, 100%);
+  --warning: hsl(38, 92%, 50%);
+  --warning-foreground: hsl(220, 13%, 8%);
+  --info: hsl(217, 91%, 60%);
+  --info-foreground: hsl(220, 13%, 8%);
+  
+  /* Chart colors */
+  --chart-1: hsl(217, 91%, 60%);
+  --chart-2: hsl(142, 76%, 36%);
+  --chart-3: hsl(38, 92%, 50%);
+  --chart-4: hsl(0, 84%, 60%);
+  --chart-5: hsl(280, 100%, 70%);
+  
+  /* Sidebar colors */
+  --sidebar: hsl(220, 13%, 10%);
+  --sidebar-foreground: hsl(220, 13%, 95%);
+  --sidebar-primary: hsl(217, 91%, 60%);
+  --sidebar-primary-foreground: hsl(220, 13%, 8%);
+  --sidebar-accent: hsl(220, 13%, 18%);
+  --sidebar-accent-foreground: hsl(220, 13%, 95%);
+  --sidebar-border: hsl(220, 13%, 25%);
+  --sidebar-ring: hsl(217, 91%, 60%);
 }
 
 @layer base {

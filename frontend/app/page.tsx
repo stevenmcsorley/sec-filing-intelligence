@@ -70,11 +70,11 @@ export default function HomePage() {
     } finally {
       setLoadingFilings(false)
     }
-  }, [isAuthenticated, mockFilings, authLoading, accessToken])
+  }, [isAuthenticated, authLoading, fetchWithAuth, mockFilings])
 
   useEffect(() => {
     loadRecentFilings()
-  }, [isAuthenticated]) // Re-run when authentication status changes
+  }, [loadRecentFilings]) // Re-run when authentication status changes
 
   const displayFilings = recentFilings.length > 0 ? recentFilings : mockFilings
 
@@ -102,10 +102,10 @@ export default function HomePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-background via-card to-background">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-purple-600/10" />
         <div className="relative container mx-auto px-4 py-20 lg:py-32">
           <div className="text-center max-w-4xl mx-auto">
             <Badge variant="secondary" className="mb-4">
@@ -115,7 +115,7 @@ export default function HomePage() {
             <h1 className="text-5xl lg:text-7xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent mb-6">
               Market Intelligence from SEC Filings
             </h1>
-            <p className="text-xl text-slate-300 mb-8 leading-relaxed">
+            <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
               Stay ahead of market movements with AI-powered analysis of SEC filings.
               Get real-time insights, signal detection, and comprehensive market intelligence
               from the most important financial documents.
@@ -151,27 +151,27 @@ export default function HomePage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-slate-900/50">
+      <section className="py-20 bg-card/50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
               Why Choose SEC Filing Intelligence?
             </h2>
-            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Built for financial professionals who need accurate, timely insights from SEC data
             </p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
-              <Card key={index} className="bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-colors">
+              <Card key={index} className="bg-card/50 border-border hover:bg-card/70 transition-colors">
                 <CardHeader className="text-center">
-                  <div className="mx-auto mb-4 p-3 bg-slate-700/50 rounded-full w-fit">
+                  <div className="mx-auto mb-4 p-3 bg-muted/50 rounded-full w-fit">
                     {feature.icon}
                   </div>
-                  <CardTitle className="text-white">{feature.title}</CardTitle>
+                  <CardTitle className="text-foreground">{feature.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <CardDescription className="text-slate-400 text-center">
+                  <CardDescription className="text-muted-foreground text-center">
                     {feature.description}
                   </CardDescription>
                 </CardContent>
@@ -185,33 +185,33 @@ export default function HomePage() {
       <section className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+            <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
               Recent Market Insights
             </h2>
-            <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               See the latest filings and analysis from major companies
             </p>
           </div>
           {loadingFilings ? (
             <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
               {displayFilings.map((filing, index) => (
-                <Card key={index} className="bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-colors">
+                <Card key={index} className="bg-card/50 border-border hover:bg-card/70 transition-colors">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div>
-                        <CardTitle className="text-white text-lg">
+                        <CardTitle className="text-foreground text-lg">
                           {filing.companyName || `CIK: ${filing.cik}`}
                           {filing.ticker && (
-                            <span className="ml-2 text-sm font-normal text-slate-400">
+                            <span className="ml-2 text-sm font-normal text-muted-foreground">
                               ({filing.ticker})
                             </span>
                           )}
                         </CardTitle>
-                        <CardDescription className="text-slate-400">
+                        <CardDescription className="text-muted-foreground">
                           CIK: {filing.cik}
                         </CardDescription>
                       </div>
@@ -221,10 +221,10 @@ export default function HomePage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-slate-300 text-sm mb-4">
+                    <p className="text-foreground text-sm mb-4">
                       {filing.summary || filing.analysis?.brief || "Recent SEC filing with important disclosures and financial updates"}
                     </p>
-                    <div className="flex items-center justify-between text-xs text-slate-500">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Filed {filing.filedAt.toLocaleDateString()}</span>
                       <Button size="sm" variant="ghost" asChild className="text-blue-400 hover:text-blue-300">
                         <Link href={!authLoading && isAuthenticated ? "/filings" : "/auth/signin"}>
@@ -259,12 +259,12 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-blue-600/10 to-purple-600/10">
+      <section className="py-20 bg-gradient-to-r from-primary/10 to-purple-600/10">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+          <h2 className="text-3xl lg:text-4xl font-bold text-foreground mb-4">
             Ready to Access Market Intelligence?
           </h2>
-          <p className="text-slate-400 text-lg mb-8 max-w-2xl mx-auto">
+          <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
             Join thousands of financial professionals who rely on our platform for critical market insights
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

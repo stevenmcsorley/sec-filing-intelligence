@@ -31,6 +31,9 @@ async def reprocess_form3_filings() -> None:
 
         logger.info(f"Found {len(filings)} Form 3 filings to process")
 
+        # Initialize Redis client for caching
+        from redis.asyncio import Redis
+        redis_client = Redis.from_url("redis://redis:6379/0")
         ticker_service = TickerLookupService()
         updated_count = 0
 

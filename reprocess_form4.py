@@ -75,6 +75,9 @@ async def reprocess_form4_filings():
 
                 if issuer_company is None:
                     # Create new company for the issuer
+                    # Initialize Redis client for caching
+                    from redis.asyncio import Redis
+                    redis_client = Redis.from_url("redis://redis:6379/0")
                     ticker_service = TickerLookupService()
                     company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
 
@@ -89,6 +92,9 @@ async def reprocess_form4_filings():
                     LOGGER.info(f"Created new issuer company: {issuer_company.name} ({issuer_cik})")
                 else:
                     # Update existing issuer company info if needed
+                    # Initialize Redis client for caching
+                    from redis.asyncio import Redis
+                    redis_client = Redis.from_url("redis://redis:6379/0")
                     ticker_service = TickerLookupService()
                     company_info = await ticker_service.get_company_info_for_cik(issuer_cik)
 

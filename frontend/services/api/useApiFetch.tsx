@@ -86,7 +86,7 @@ export function useApiFetch() {
     }
 
     return res
-  }, [accessToken, isLoading, signOut])
+  }, [accessToken, isLoading])
 
   return { fetchWithAuth, buildUrl }
 }
