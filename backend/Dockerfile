@@ -6,6 +6,18 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY backend/requirements.txt backend/requirements-dev.txt ./
+# Ensure system build dependencies are present for packages that require compilation
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libpq-dev \
+    cargo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip/setuptools/wheel to ensure modern wheel support
+RUN python -m pip install --upgrade pip setuptools wheel
+
+# Install Python requirements (no-cache-dir to keep image small)
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/app ./app

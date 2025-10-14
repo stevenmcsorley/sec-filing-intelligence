@@ -3,9 +3,12 @@
 
 import { useEffect, useState } from "react"
 import { FilingsService } from "@/services/api/filings.service"
+import useApiFetch from "@/services/api/useApiFetch"
 import { FilingAdapter } from "@/services/adapters/filing.adapter"
 import { FilingCard } from "@/components/filings/FilingCard"
 import { CompanyCard } from "@/components/filings/CompanyCard"
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute"
+import { useAuth } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -24,14 +27,26 @@ interface Filters {
 export default function FilingsPage() {
   console.log('FilingsPage component mounted')
   
+  const { isAuthenticated, isLoading: authLoading, accessToken } = useAuth()
   const [filings, setFilings] = useState<FilingList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>({})
 
   useEffect(() => {
-    loadFilings()
-  }, [])
+    // Only load after the auth provider has finished its initial check
+    if (!authLoading) {
+      if (isAuthenticated) {
+        loadFilings()
+      } else {
+        // If not authenticated, we might still want to show empty state or redirect
+        // ProtectedRoute will handle redirecting to signin if required
+        loadFilings()
+      }
+    }
+  }, [isAuthenticated, authLoading])
+
+  const { fetchWithAuth } = useApiFetch()
 
   const loadFilings = async (searchFilters?: Filters) => {
     try {
@@ -41,10 +56,20 @@ export default function FilingsPage() {
       // Determine search parameters - don't pass both cik and ticker
       let searchParams: any = {
         limit: 100, // Get more filings to group by company
-        form_type: apiFilters.formType,
-        status: apiFilters.status,
-        filed_after: apiFilters.filedAfter,
-        filed_before: apiFilters.filedBefore,
+      }
+      
+      // Only add parameters that have actual values (not undefined, null, or empty string)
+      if (apiFilters.formType && apiFilters.formType !== 'undefined' && apiFilters.formType.trim() !== '') {
+        searchParams.form_type = apiFilters.formType
+      }
+      if (apiFilters.status && apiFilters.status !== 'undefined' && apiFilters.status.trim() !== '') {
+        searchParams.status = apiFilters.status
+      }
+      if (apiFilters.filedAfter && apiFilters.filedAfter instanceof Date) {
+        searchParams.filed_after = apiFilters.filedAfter.toISOString().split('T')[0]
+      }
+      if (apiFilters.filedBefore && apiFilters.filedBefore instanceof Date) {
+        searchParams.filed_before = apiFilters.filedBefore.toISOString().split('T')[0]
       }
       
       if (apiFilters.search) {
@@ -57,7 +82,15 @@ export default function FilingsPage() {
         }
       }
       
-      const apiResponse = await FilingsService.list(searchParams)
+      let apiResponse
+      if (isAuthenticated) {
+        const url = `/filings/?${new URLSearchParams(searchParams).toString()}`
+        const res = await fetchWithAuth(url)
+        if (!res.ok) throw new Error('Failed to fetch filings')
+        apiResponse = await res.json()
+      } else {
+        apiResponse = await FilingsService.list(undefined, searchParams)
+      }
       console.log('API Response:', apiResponse)
       const domainData = FilingAdapter.listFromAPI(apiResponse)
       console.log('Domain Data:', domainData)
@@ -122,7 +155,7 @@ export default function FilingsPage() {
             <CardTitle>SEC Filings</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Loading filings... (Component mounted)</p>
+            <p>Loading filings...</p>
           </CardContent>
         </Card>
       </div>
@@ -148,7 +181,8 @@ export default function FilingsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
+    <ProtectedRoute>
+      <div className="container mx-auto py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">SEC Filing Intelligence</h1>
         <p className="text-muted-foreground mt-2">
@@ -156,50 +190,50 @@ export default function FilingsPage() {
         </p>
       </div>
 
-      {/* Search and Filter Controls */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Search & Filter</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="search">Search</Label>
-              <Input
-                id="search"
-                placeholder="CIK, ticker, or company name"
-                value={filters.search || ''}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="formType">Form Type</Label>
-              <Select value={filters.formType || 'all'} onValueChange={(value) => handleFilterChange('formType', value === 'all' ? undefined : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All forms" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All forms</SelectItem>
-                  <SelectItem value="4">Form 4</SelectItem>
-                  <SelectItem value="8-K">Form 8-K</SelectItem>
-                  <SelectItem value="10-K">Form 10-K</SelectItem>
-                  <SelectItem value="10-Q">Form 10-Q</SelectItem>
-                  <SelectItem value="13D">Schedule 13D</SelectItem>
-                  <SelectItem value="144">Form 144</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={filters.status || 'all'} onValueChange={(value) => handleFilterChange('status', value === 'all' ? undefined : value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="parsed">Parsed</SelectItem>
-                  <SelectItem value="failed">Failed</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
+    {/* Search and Filter Controls */}
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="text-lg">Search & Filter</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="search">Search</Label>
+            <Input
+              id="search"
+              placeholder="CIK, ticker, or company name"
+              value={filters.search || ''}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="formType">Form Type</Label>
+            <Select value={filters.formType || 'all'} onValueChange={(value) => handleFilterChange('formType', value === 'all' ? undefined : value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="All forms" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All forms</SelectItem>
+                <SelectItem value="4">Form 4</SelectItem>
+                <SelectItem value="8-K">Form 8-K</SelectItem>
+                <SelectItem value="10-K">Form 10-K</SelectItem>
+                <SelectItem value="10-Q">Form 10-Q</SelectItem>
+                <SelectItem value="13D">Schedule 13D</SelectItem>
+                <SelectItem value="144">Form 144</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="status">Status</Label>
+            <Select value={filters.status || 'all'} onValueChange={(value) => handleFilterChange('status', value === 'all' ? undefined : value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="parsed">Parsed</SelectItem>
+                <SelectItem value="failed">Failed</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -262,5 +296,6 @@ export default function FilingsPage() {
         </>
       )}
     </div>
+    </ProtectedRoute>
   )
 }
