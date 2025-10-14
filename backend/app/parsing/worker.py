@@ -23,7 +23,7 @@ from app.models.filing import Filing, FilingBlob, FilingSection, FilingStatus
 from app.orchestration.metrics import CHUNK_PLANNER_CHUNKS_TOTAL, CHUNK_PLANNER_LATENCY_SECONDS
 from app.orchestration.planner import ChunkPlanner, ChunkPlannerOptions, PlannerSection
 from app.orchestration.queue import ChunkQueue
-from app.sec_utils import extract_issuer_cik
+from app.sec_utils import extract_issuer_cik, extract_issuer_name
 from app.services.ticker_lookup import TickerLookupService
 
 from .metrics import PARSER_ERRORS_TOTAL, PARSER_LATENCY_SECONDS, PARSER_SECTIONS_TOTAL
@@ -149,8 +149,8 @@ class ParserWorker:
                         )
                     )
                 
-                # For Form 4 filings, extract issuer information and update company if needed
-                if filing.form_type == '4':
+                # For Form 4, Form 144, Schedule 13D/A, and Form 3 filings, extract issuer information and update company if needed
+                if filing.form_type in ['4', '144', 'SCHEDULE 13D/A', '3']:
                     await self._process_form4_issuer(session, filing, sections)
                 
                 filing.status = FilingStatus.PARSED.value
@@ -186,9 +186,10 @@ class ParserWorker:
     async def _process_form4_issuer(
         self, session: AsyncSession, filing: Filing, sections: list[Section]
     ) -> None:
-        """Process Form 4 filing to extract issuer information and update company records."""
-        # Extract issuer CIK from raw filing content (XML)
+        """Process Form 4, Form 144, and Schedule 13D/A filings to extract issuer information and update company records."""
+        # Extract issuer CIK and name from filing content
         issuer_cik = None
+        issuer_name = None
         
         # First try the raw blob content
         blob_stmt = (
@@ -202,12 +203,14 @@ class ParserWorker:
                 raw_content = await self._fetcher.fetch(raw_blob.location)
                 raw_text = raw_content.decode('utf-8', errors='ignore')
                 issuer_cik = extract_issuer_cik(raw_text)
+                issuer_name = extract_issuer_name(raw_text)
                 if issuer_cik:
                     LOGGER.info(
                         "Extracted issuer CIK from raw filing content",
                         extra={
                             "accession": filing.accession_number,
                             "issuer_cik": issuer_cik,
+                            "issuer_name": issuer_name,
                             "original_cik": filing.cik
                         }
                     )
@@ -221,12 +224,14 @@ class ParserWorker:
         if not issuer_cik:
             for section in sections:
                 issuer_cik = extract_issuer_cik(section.content)
+                issuer_name = extract_issuer_name(section.content)
                 if issuer_cik:
                     LOGGER.info(
                         "Extracted issuer CIK from parsed sections",
                         extra={
                             "accession": filing.accession_number,
                             "issuer_cik": issuer_cik,
+                            "issuer_name": issuer_name,
                             "original_cik": filing.cik
                         }
                     )
@@ -234,7 +239,7 @@ class ParserWorker:
         
         if not issuer_cik:
             LOGGER.warning(
-                "Could not extract issuer CIK from Form 4 filing",
+                "Could not extract issuer CIK from Form 4/144/Schedule 13D/A filing",
                 extra={"accession": filing.accession_number}
             )
             return
@@ -253,8 +258,10 @@ class ParserWorker:
                 issuer_company = Company(
                     cik=issuer_cik,
                     name=(
+                        issuer_name or
                         company_info.get("company_name", f"Company {issuer_cik}")
-                        if company_info else f"Company {issuer_cik}"
+                        if company_info else 
+                        (issuer_name or f"Company {issuer_cik}")
                     ),
                     ticker=company_info.get("ticker") if company_info else None
                 )
@@ -323,15 +330,16 @@ class ParserWorker:
                     filing.ticker = ticker
 
     async def _try_process_form4_issuer_from_raw(self, task: ParseTask) -> None:
-        """Try to process Form 4 issuer information from raw content even if parsing failed."""
+        """Try to process Form 4, Form 144, Schedule 13D/A, and Form 3 issuer information from raw content even if parsing failed."""
         async with self._session_factory() as session:
             stmt = select(Filing).where(Filing.accession_number == task.accession_number)
             filing = (await session.execute(stmt)).scalar_one_or_none()
-            if filing is None or filing.form_type != '4':
+            if filing is None or filing.form_type not in ['4', '144', 'SCHEDULE 13D/A', '3']:
                 return
             
             # Extract issuer CIK from raw filing content (XML)
             issuer_cik = None
+            issuer_name = None
             
             # Try the raw blob content
             blob_stmt = (
@@ -345,12 +353,14 @@ class ParserWorker:
                     raw_content = await self._fetcher.fetch(raw_blob.location)
                     raw_text = raw_content.decode('utf-8', errors='ignore')
                     issuer_cik = extract_issuer_cik(raw_text)
+                    issuer_name = extract_issuer_name(raw_text)
                     if issuer_cik:
                         LOGGER.info(
                             "Extracted issuer CIK from raw content for failed parsing",
                             extra={
                                 "accession": filing.accession_number,
                                 "issuer_cik": issuer_cik,
+                                "issuer_name": issuer_name,
                                 "original_cik": filing.cik
                             }
                         )
@@ -362,7 +372,7 @@ class ParserWorker:
             
             if not issuer_cik:
                 LOGGER.warning(
-                    "Could not extract issuer CIK from failed Form 4 filing",
+                    "Could not extract issuer CIK from failed Form 4/144/Schedule 13D/A/Form 3 filing",
                     extra={"accession": filing.accession_number}
                 )
                 return
@@ -381,8 +391,10 @@ class ParserWorker:
                     issuer_company = Company(
                         cik=issuer_cik,
                         name=(
+                            issuer_name or
                             company_info.get("company_name", f"Company {issuer_cik}")
-                            if company_info else f"Company {issuer_cik}"
+                            if company_info else 
+                            (issuer_name or f"Company {issuer_cik}")
                         ),
                         ticker=company_info.get("ticker") if company_info else None
                     )

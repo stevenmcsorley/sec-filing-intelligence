@@ -24,6 +24,7 @@ services:
       dockerfile: frontend/Dockerfile
     env_file:
       - ../../config/frontend.env.example
+      - ../../config/frontend.env
     environment:
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
       - NEXT_PUBLIC_SSE_BASE_URL=http://localhost:8000
@@ -68,12 +69,14 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:25.0.2
-    command: start-dev
+    command: start-dev --import-realm
+    environment:
+      - KC_IMPORT_REALM_STRATEGY=OVERWRITE_EXISTING
     env_file:
-      - ../../config/keycloak.env.example
+      - ../../config/keycloak.env
     volumes:
       - keycloak-data:/opt/keycloak/data
-      - ../keycloak/realm-export:/realm-export:ro
+      - ../keycloak/realm-export:/opt/keycloak/data/import:ro
     depends_on:
       - postgres
     ports:

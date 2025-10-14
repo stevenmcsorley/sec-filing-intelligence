@@ -19,6 +19,12 @@ from app.repositories import FilingRepository
 router = APIRouter(prefix="/filings", tags=["filings"])
 
 
+@router.get("/test")
+async def test_endpoint() -> dict[str, str]:
+    """Simple test endpoint to verify router is working."""
+    return {"message": "Router is working!"}
+
+
 @router.get("/")
 async def list_filings(
     token: Annotated[TokenContext, Depends(get_current_token)],

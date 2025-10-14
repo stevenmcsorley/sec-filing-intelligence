@@ -1,0 +1,114 @@
+# 📄 SEC Filings Explained (Concise Reference)
+
+## 1. Registration / Offering / Issuance Filings
+
+| Form / Filing | Purpose / When Used | Stock / Market Impact (Typical) |
+|---|---|---|
+| **S-1** | Registration statement for new securities / IPOs / unseasoned issuers :contentReference[oaicite:1]{index=1} | Signals an upcoming IPO or capital raise; can generate hype. Post-listing volatility is common. |
+| **S-3** | Simplified registration for “seasoned” issuers (meeting criteria) :contentReference[oaicite:2]{index=2} | Easier capital raising, but possible dilution. Minor downward pressure possible. |
+| **S-4** | Registration in connection with mergers, acquisitions, reorganizations :contentReference[oaicite:3]{index=3} | Stock of target typically rises (due to premium); acquirer stock may drop (dilution, integration risk). |
+| **S-8** | Register securities for employee benefit plans / stock compensation :contentReference[oaicite:4]{index=4} | Usually muted impact, though over time could introduce dilution pressure. |
+| **S-11** | Registration for certain real estate investment trusts (REITs) / real property offerings :contentReference[oaicite:5]{index=5} | Dependent on structure; may draw interest from income / real-estate investors. |
+| **Form D** | Notice of exempt offerings under Regulation D (private placements) :contentReference[oaicite:6]{index=6} | Private, so limited public impact. But may signal insider/VC confidence or future public offering. |
+
+---
+
+## 2. Periodic / Reporting Filings
+
+| Form / Filing | Purpose / When Used | Stock / Market Impact (Typical) |
+|---|---|---|
+| **10-K** | Annual audited report (business, financials, risks) for U.S. issuers :contentReference[oaicite:7]{index=7} | A major catalyst. Strong results or guidance can boost stock; surprises or negative disclosures can drag it down. |
+| **10-K/A** | Amendment to a 10-K (correcting or updating) :contentReference[oaicite:8]{index=8} | If corrections are material, can erode confidence, cause revaluation. |
+| **10-Q** | Quarterly (unaudited) report for first three quarters :contentReference[oaicite:9]{index=9} | Regular volatility on earnings dates. Investors look for trends, surprises, guidance. |
+| **10-Q/A** | Amendment to 10-Q | Similar logic — corrections or restatements can spook markets. |
+| **10-KT / 10-QT** | Transition reports in years of fiscal changes (e.g. year change) :contentReference[oaicite:10]{index=10} | Usually minor, unless transitions uncover risks or accounting shifts. |
+| **11-K** | Annual report of employee benefit / stock plans :contentReference[oaicite:11]{index=11} | Typically low impact; more relevant to plan participants. |
+| **11-K / 11-K/A / 11-KT** | Variants / amendments / transition versions :contentReference[oaicite:12]{index=12} | As above. |
+| **20-F** | Annual / transition report by foreign private issuers (non-U.S. companies listed in U.S.) :contentReference[oaicite:13]{index=13} | Similar to 10-K for foreign firms — investors watch for compliance, growth, transparency. |
+| **6-K** | Interim reports / material event updates by foreign issuers between their annual filings :contentReference[oaicite:14]{index=14} | Market reaction depends on the nature of disclosure; can mimic 8-K behavior for U.S. firms. |
+
+---
+
+## 3. Material / “Current” Event Filings
+
+| Form / Filing | Purpose / When Used | Stock / Market Impact (Typical) |
+|---|---|---|
+| **8-K** | Reports “material” events between periodic filings (e.g. M&A, leadership change, bankruptcy) :contentReference[oaicite:15]{index=15} | High volatility. Investors react in real time to surprises or strategic shifts. |
+| **8-K/A** | Amendment or correction to 8-K | If material, may cause revaluation or investor skepticism. |
+
+---
+
+## 4. Insider / Ownership & Activist Filings
+
+| Form / Filing | Purpose / When Used | Stock / Market Impact (Typical) |
+|---|---|---|
+| **Form 3** | Initial insider / beneficial ownership report :contentReference[oaicite:16]{index=16} | Makes insider holdings visible; minor immediate effect unless large stakes are introduced. |
+| **Form 4** | Reports changes in insider holdings (buy/sell) :contentReference[oaicite:17]{index=17} | A strong insider buy is bullish; large insider sales may spook investors. |
+| **Form 5** | Annual summary of insider transactions not reported on 4 | Usually low impact unless reveals a large unreported change. |
+| **Schedule 13D** | Filed by anyone acquiring >5% with intent (active investor) :contentReference[oaicite:18]{index=18} | Often seen as a signal of activism or takeover intentions — share price tends to move significantly. |
+| **Schedule 13G** | Simplified 13D for passive investors (non-activist) :contentReference[oaicite:19]{index=19} | Less dramatic — may show institutional interest, but not necessarily movement. |
+| **Form 144** | Notice of proposed sale by insiders (restricted or control shares) :contentReference[oaicite:20]{index=20} | Can indicate future pressure on stock — especially when large volumes are involved. |
+
+---
+
+## 5. Corporate Actions, Tender Offers, M&A, Proxy, etc.
+
+| Form / Filing | Purpose / When Used | Stock / Market Impact (Typical) |
+|---|---|---|
+| **SC 13E-3** | Going-private / buyout transactions :contentReference[oaicite:21]{index=21} | Usually bullish for shareholders — premium paid over market, though delisting risks. |
+| **SC 14D-1 / SC 14D-9** | Tender offer documentation / responses :contentReference[oaicite:22]{index=22} | If a hostile bid, big swings; premium offers often push price upward. |
+| **DEF 14A** | Proxy statement / solicitation before shareholder votes (director elections, compensation, etc.) :contentReference[oaicite:23]{index=23} | Can influence governance, mergers, or executive changes — investor confidence may shift. |
+| **DEFA 14A / DEF 14C / DEFM 14A** | Proxy / information variations / amendments :contentReference[oaicite:24]{index=24} | Similar dynamics — clarity or surprises here matter for governance. |
+| **Form 25** | Notice of withdrawal from listing / deregistration :contentReference[oaicite:25]{index=25} | Strongly negative — signals exit from public markets, reduced liquidity. |
+| **15-12B / 15-12G** | Termination of registration under Exchange Act (Sections 12(b) / 12(g)) :contentReference[oaicite:26]{index=26} | Negative sentiment — delisting, less oversight, liquidity risk. |
+| **15-15D** | Suspension of duty to file (under sections 13 / 15(d)) :contentReference[oaicite:27]{index=27} | Possible red flag — company may be moving away from public disclosures. |
+| **18-K** | Annual report for foreign governments / political subdivisions :contentReference[oaicite:28]{index=28} | Rarely relevant for corporate stock — more applicable for sovereign debt or securities. |
+| **Others (e.g. 40-Act forms, investment company forms N-1A, N-2, etc.)** | Used by mutual funds, trusts, investment companies, etc. :contentReference[oaicite:29]{index=29} | Impact depends on size and exposure; can shift flows in funds, which in turn affect their underlying holdings. |
+
+---
+
+## 6. How Filings Can Move a Stock — Key Mechanisms & Patterns
+
+Here’s a summary of *how* and *why* SEC filings sometimes lead to stock moves:
+
+1. **Surprise & Information Asymmetry**  
+   When a filing reveals something unexpected (e.g. sudden CEO exit, write-downs, or major deal), many investors reprice quickly.
+
+2. **Dilution / Capital Raising**  
+   Registration / offering forms (S-3, S-1) may mean new shares are coming. Investors fear dilution.
+
+3. **Insider Signals / Behavioral Cues**  
+   Insider buying (Form 4) can be seen as confidence; heavy insider selling may suggest insiders think the stock is peaking.
+
+4. **M&A & Strategic Moves**  
+   Filings around mergers, acquisitions, spin-offs, going-private (e.g. S-4, 8-K, SC 13E-3) often drive large directional moves.
+
+5. **Governance & Proxy Battles**  
+   Proxy statements (DEF 14A etc.) can lead to changes in management or direction — markets react to perceived “who wins” outcomes.
+
+6. **Compliance & Legal Risk**  
+   Amendments / corrections (10-K/A, 8-K/A) often raise red flags. Restatements can erode trust and valuation.
+
+7. **Liquidity & Listing Changes**  
+   Forms like Form 25 or delisting notices reduce market access, making the stock less attractive.
+
+---
+
+### Notes & Caveats
+
+- Even when a filing *should* move a stock, markets sometimes already price in the expectation. The *degree* of surprise matters.
+- Smaller companies or thinly traded stocks may see exaggerated price movements (volatility) on small disclosures.
+- Some filings (especially those by passive investors) have muted effects if they don’t signal intent or strategy.
+- The *timing* of a filing (after market close, pre-market) can amplify overnight reactions.
+
+---
+
+### 📚 References
+- [Investopedia – SEC Filings Explained](https://www.investopedia.com/articles/fundamental-analysis/08/sec-forms.asp)
+- [SEC.gov – Full List of Forms](https://www.sec.gov/forms)
+- [Intelligize – SEC Forms Quick Reference (PDF)](https://www.intelligize.com/wp-content/uploads/2023/04/SEC-Forms_Quick-Reference.pdf)
+
+---
+
+> **Tip:** You can monitor real-time filings via [https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent](https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent)
+> or use the EDGAR API for programmatic access.

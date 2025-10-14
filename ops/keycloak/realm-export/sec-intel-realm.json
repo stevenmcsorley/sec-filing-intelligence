@@ -13,7 +13,8 @@
       "name": "Frontend SPA",
       "rootUrl": "http://localhost:3000",
       "redirectUris": [
-        "http://localhost:3000/*"
+        "http://localhost:3000/*",
+        "http://localhost:3000/api/auth/callback/keycloak*"
       ],
       "webOrigins": [
         "*"
@@ -26,10 +27,9 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
-      "attributes": {
-        "pkce.code.challenge.method": "S256"
-      },
+      "attributes": {},
       "defaultClientScopes": [
+        "openid",
         "profile",
         "email",
         "roles"
@@ -129,9 +129,28 @@
       ]
     }
   ],
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "User",
+      "email": "test@example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "basic_free"
+      ]
+    }
+  ],
   "defaultRole": {
     "name": "default-roles-sec-intel",
-    "realm": "sec-intel",
     "composite": true,
     "clientRole": false,
     "containerId": "sec-intel",

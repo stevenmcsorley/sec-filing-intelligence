@@ -29,11 +29,30 @@ compose() {
 
 # Ensure Keycloak is reachable before attempting to seed.
 echo "Checking Keycloak availability..."
-compose exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials \
+if ! compose exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials \
   --server "$KEYCLOAK_SERVER_URL_INSIDE" \
   --realm master \
   --user "${KEYCLOAK_ADMIN:-admin}" \
-  --password "${KEYCLOAK_ADMIN_PASSWORD:-admin}" >/dev/null
+  --password "${KEYCLOAK_ADMIN_PASSWORD:-admin}" >/dev/null 2>&1; then
+  echo "Admin user not configured, attempting to set password..."
+  # Try to set the admin password using the REST API
+  ADMIN_TOKEN=$(curl -s -X POST "$KEYCLOAK_SERVER_URL_INSIDE/realms/master/protocol/openid-connect/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "grant_type=password&client_id=admin-cli&username=${KEYCLOAK_ADMIN:-admin}&password=${KEYCLOAK_ADMIN_PASSWORD:-admin}" | jq -r '.access_token' 2>/dev/null || echo "")
+  
+  if [[ -n "$ADMIN_TOKEN" ]]; then
+    echo "Got admin token, configuring kcadm..."
+    compose exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh config credentials \
+      --server "$KEYCLOAK_SERVER_URL_INSIDE" \
+      --realm master \
+      --user "${KEYCLOAK_ADMIN:-admin}" \
+      --password "${KEYCLOAK_ADMIN_PASSWORD:-admin}" >/dev/null
+  else
+    echo "Failed to get admin token. Admin user may need manual password reset."
+    echo "Please visit http://localhost:8080 and set the admin password manually."
+    exit 1
+  fi
+fi
 
 echo "Seeding realm data from $REALM_FILE..."
 if compose exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh get realms/sec-intel >/dev/null 2>&1; then

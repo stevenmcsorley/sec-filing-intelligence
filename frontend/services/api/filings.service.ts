@@ -1,10 +1,11 @@
 // services/api/filings.service.ts
 import { APIFilingDetail, APIFilingList } from "@/types/api.types"
+import { apiFetch, buildUrl } from "./fetcher"
 
 export class FilingsService {
-  private static readonly BASE = `${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'}/filings/`
+  private static readonly PATH = '/filings'
 
-  static async list(params?: {
+  static async list(accessToken?: string, params?: {
     limit?: number
     offset?: number
     cik?: string
@@ -25,26 +26,43 @@ export class FilingsService {
     if (params?.filed_after) searchParams.set("filed_after", params.filed_after.toISOString())
     if (params?.filed_before) searchParams.set("filed_before", params.filed_before.toISOString())
 
-    const res = await fetch(`${this.BASE}?${searchParams.toString()}`)
+    const url = buildUrl(`${this.PATH}/?${searchParams.toString()}`)
+    const res = await apiFetch(url, {}, accessToken)
     if (!res.ok) throw new Error("Failed to fetch filings")
     return res.json()
   }
 
-  static async get(id: number): Promise<APIFilingDetail> {
-    const res = await fetch(`${this.BASE}/${id}`)
+  static async get(id: number, accessToken?: string): Promise<APIFilingDetail> {
+    const url = buildUrl(`${this.PATH}/${id}`)
+    const res = await apiFetch(url, {}, accessToken)
     if (!res.ok) throw new Error("Failed to fetch filing")
     return res.json()
   }
 
-  static async getSections(id: number): Promise<any[]> {
-    const res = await fetch(`${this.BASE}/${id}/sections`)
+  static async getSections(id: number, accessToken?: string): Promise<any[]> {
+    const url = buildUrl(`${this.PATH}/${id}/sections`)
+    const res = await apiFetch(url, {}, accessToken)
     if (!res.ok) throw new Error("Failed to fetch filing sections")
     return res.json()
   }
 
-  static async getContent(id: number, kind: "raw" | "text" | "sections" = "text"): Promise<any> {
-    const res = await fetch(`${this.BASE}/${id}/content?kind=${kind}`)
-    if (!res.ok) throw new Error("Failed to fetch filing content")
-    return res.json()
+  static async getPublicRecent(limit: number = 3): Promise<APIFilingList> {
+    try {
+      const url = buildUrl(`/public/filings/recent?limit=${limit}`)
+      const response = await apiFetch(url)
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      return await response.json()
+    } catch (error) {
+      console.error('Failed to fetch public recent filings:', error)
+      // Return empty list as fallback
+      return {
+        filings: [],
+        total_count: 0,
+        limit,
+        offset: 0,
+      }
+    }
   }
 }
