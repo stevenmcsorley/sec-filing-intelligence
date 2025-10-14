@@ -96,9 +96,9 @@ async def get_public_recent_filings(
     )
 
     # Group filings by company and get the most recent filing for each company
-    company_filings = {}
+    company_filings: dict[str, Any] = {}
     for filing in filings:
-        company_key = filing.company_id if filing.company else filing.cik
+        company_key = str(filing.company_id if filing.company else filing.cik)
         if (company_key not in company_filings or 
             filing.filed_at > company_filings[company_key].filed_at):
             company_filings[company_key] = filing
