@@ -1,22 +1,21 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any, cast, Annotated
+from typing import Annotated, Any, cast
 
-from fastapi import FastAPI, Depends, Query
+from fastapi import Depends, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .auth.router import router as auth_router
 from .config import get_settings
-from .db import init_db
+from .db import get_db_session, init_db
 from .diff import DiffService
 from .downloader import DownloadService
 from .entities import EntityExtractionService
 from .filings import router as filings_router
-from .db import get_db_session
-from .repositories import FilingRepository
 from .ingestion import IngestionService
 from .parsing import ParserService
+from .repositories import FilingRepository
 from .summarization import SectionSummaryService
 
 
@@ -126,16 +125,7 @@ async def get_public_recent_filings(
         company_name = filing.company.name if filing.company else None
         extracted_ticker = filing.company.ticker if filing.company else filing.ticker
         
-        # Create a simple analysis brief based on form type
-        brief = ""
-        if filing.form_type == "4":
-            brief = "Insider trading disclosure filing"
-        elif filing.form_type == "8-K":
-            brief = "Current report of material events"
-        elif filing.form_type == "10-K":
-            brief = "Annual report with comprehensive financial information"
-        elif filing.form_type == "10-Q":
-            pass  # Quarterly report with financial results
+        # Form type analysis (brief variable removed as unused)
         filing_list.append({
             "id": filing.id,
             "cik": filing.cik,
